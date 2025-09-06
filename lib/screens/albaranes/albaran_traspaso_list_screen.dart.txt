@@ -1,0 +1,40 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class AlbaranListScreen extends StatelessWidget {
+  const AlbaranListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Albaranes")),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection("albaranes").orderBy("fecha", descending: true).snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(child: Text("No hay albaranes"));
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final albaran = docs[index].data() as Map<String, dynamic>;
+              return ListTile(
+                title: Text(albaran["numero"]),
+                subtitle: Text("${albaran["origen"]["tipo"]} → ${albaran["destino"]["tipo"]}"),
+                trailing: Text(albaran["estado"]),
+                onTap: () {
+                  // TODO: abrir detalle del albarán
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

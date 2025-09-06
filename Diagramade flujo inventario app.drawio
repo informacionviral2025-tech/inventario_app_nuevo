@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Diagrama Gestión Almacén">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1"
+     fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Inicio -->
+        <mxCell id="Inicio" value="Inicio / Dashboard" style="shape=ellipse;fillColor=#DAE8FC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="100" y="100" width="160" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Bloques principales -->
+        <mxCell id="Empresas" value="Gestión de Empresas" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="50" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Inventario" value="Gestión de Inventario" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="150" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Proveedores" value="Gestión de Proveedores" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="250" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Clientes" value="Gestión de Clientes" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="350" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Obras" value="Gestión de Obras" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="450" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Traspasos" value="Gestión de Traspasos" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="550" width="180" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="Config" value="Configuración" style="shape=rectangle;rounded=1;fillColor=#FFF2CC;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="400" y="650" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Inventario -->
+        <mxCell id="Articulos" value="Artículos" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="120" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Entradas" value="Entradas" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="170" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Salidas" value="Salidas" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="220" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Albaranes" value="Albaranes" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="270" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Stock" value="Control de Stock" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="320" width="140" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Proveedores -->
+        <mxCell id="PedidosProv" value="Pedidos a Proveedores" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="420" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="FacturasProv" value="Facturas Proveedores" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="470" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ContactosProv" value="Contactos Proveedores" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="520" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Clientes -->
+        <mxCell id="PedidosCli" value="Pedidos Clientes" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="620" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="FacturasCli" value="Facturas Clientes" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="670" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="ContactosCli" value="Contactos Clientes" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="720" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Obras -->
+        <mxCell id="InventObra" value="Inventario en Obra" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="820" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="SelecMerc" value="Selección de Mercancía" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="870" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Traspasos -->
+        <mxCell id="TraspasoAlm" value="Traspaso a Almacén" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="970" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="TraspasoObra" value="Traspaso entre Obras" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1020" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Submódulos Configuración -->
+        <mxCell id="Usuarios" value="Usuarios y Permisos" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1120" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Impresion" value="Formatos de Impresión" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1170" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="Parametros" value="Parámetros Generales" style="shape=rectangle;rounded=0;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1220" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Conexiones principales -->
+        <mxCell id="eInicioEmpresas" edge="1" parent="1" source="Inicio" target="Empresas"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioInventario" edge="1" parent="1" source="Inicio" target="Inventario"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioProveedores" edge="1" parent="1" source="Inicio" target="Proveedores"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioClientes" edge="1" parent="1" source="Inicio" target="Clientes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioObras" edge="1" parent="1" source="Inicio" target="Obras"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioTraspasos" edge="1" parent="1" source="Inicio" target="Traspasos"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInicioConfig" edge="1" parent="1" source="Inicio" target="Config"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Inventario -->
+        <mxCell id="eInvArticulos" edge="1" parent="1" source="Inventario" target="Articulos"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInvEntradas" edge="1" parent="1" source="Inventario" target="Entradas"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInvSalidas" edge="1" parent="1" source="Inventario" target="Salidas"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInvAlbaranes" edge="1" parent="1" source="Inventario" target="Albaranes"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eInvStock" edge="1" parent="1" source="Inventario" target="Stock"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Proveedores -->
+        <mxCell id="eProvPedidos" edge="1" parent="1" source="Proveedores" target="PedidosProv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eProvFacturas" edge="1" parent="1" source="Proveedores" target="FacturasProv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eProvContactos" edge="1" parent="1" source="Proveedores" target="ContactosProv"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Clientes -->
+        <mxCell id="eCliPedidos" edge="1" parent="1" source="Clientes" target="PedidosCli"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eCliFacturas" edge="1" parent="1" source="Clientes" target="FacturasCli"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eCliContactos" edge="1" parent="1" source="Clientes" target="ContactosCli"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Obras -->
+        <mxCell id="eObraInv" edge="1" parent="1" source="Obras" target="InventObra"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eObraSelec" edge="1" parent="1" source="Obras" target="SelecMerc"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Traspasos -->
+        <mxCell id="eTrasAlm" edge="1" parent="1" source="Traspasos" target="TraspasoAlm"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eTrasObra" edge="1" parent="1" source="Traspasos" target="TraspasoObra"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Conexiones submódulos Configuración -->
+        <mxCell id="eCfgUsuarios" edge="1" parent="1" source="Config" target="Usuarios"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eCfgImpresion" edge="1" parent="1" source="Config" target="Impresion"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eCfgParametros" edge="1" parent="1" source="Config" target="Parametros"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

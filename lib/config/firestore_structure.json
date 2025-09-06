@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "colecciones": {
+    "empresas": {
+      "campos": {
+        "nombre": "string",
+        "descripcion": "string",
+        "direccion": "string",
+        "telefono": "string",
+        "email": "string",
+        "fechaCreacion": "timestamp",
+        "activa": "boolean"
+      },
+      "subcolecciones": {
+        "articulos": {
+          "campos": {
+            "nombre": "string",
+            "descripcion": "string",
+            "precio": "number",
+            "stock": "number",
+            "codigoBarras": "string",
+            "categoria": "string",
+            "fechaCreacion": "timestamp",
+            "fechaActualizacion": "timestamp"
+          }
+        },
+        "obras": {
+          "campos": {
+            "nombre": "string",
+            "direccion": "string",
+            "empresaId": "string",
+            "fechaCreacion": "timestamp",
+            "stock": "map",
+            "estado": "string"
+          }
+        },
+        "traspasos": {
+          "campos": {
+            "origenId": "string",
+            "destinoId": "string",
+            "tipoOrigen": "string",
+            "tipoDestino": "string",
+            "articulos": "map",
+            "fecha": "timestamp",
+            "albaranId": "string"
+          }
+        },
+        "albaranes": {
+          "campos": {
+            "numero": "string",
+            "fecha": "timestamp",
+            "origen": "map",
+            "destino": "map",
+            "articulos": "map",
+            "usuario": "string",
+            "estado": "string",
+            "traspasoId": "string",
+            "observaciones": "string"
+          }
+        }
+      }
+    }
+  }
+}

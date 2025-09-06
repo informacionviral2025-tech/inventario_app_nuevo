@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "990304442289",
+    "firebase_url": "https://inventario-app-2337d-default-rtdb.firebaseio.com",
+    "project_id": "inventario-app-2337d",
+    "storage_bucket": "inventario-app-2337d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990304442289:android:80de6155da539d61cdcf90",
+        "android_client_info": {
+          "package_name": "com.almacen_caldevergazo.inventario_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtQtfXfcUh6Z77rCoyxpwki5KB5dpYXOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990304442289:android:45eba1f41a4b036fcdcf90",
+        "android_client_info": {
+          "package_name": "com.example.inventario_app_nuevo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtQtfXfcUh6Z77rCoyxpwki5KB5dpYXOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990304442289:android:f7e402af826dc2bfcdcf90",
+        "android_client_info": {
+          "package_name": "com.example.redes_sociales_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtQtfXfcUh6Z77rCoyxpwki5KB5dpYXOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
