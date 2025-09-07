@@ -1,22 +1,54 @@
 // lib/routes/app_routes.dart
+import 'package:flutter/material.dart';
+import '../screens/home_screen.dart';
+import '../screens/login_screen.dart';
+import '../screens/salidas_inventario_screen.dart';
+import '../screens/traspasos/traspaso_screen.dart';
+
 class AppRoutes {
-  // Pantalla inicial
   static const String login = '/login';
   static const String home = '/home';
-
-  // Inventario
-  static const String entradasInventario = '/entradas-inventario';
-  static const String salidasInventario = '/salidas-inventario';
+  static const String salidas = '/salidas';
   static const String traspasos = '/traspasos';
 
-  // Obras, clientes, proveedores
-  static const String obras = '/obras';
-  static const String clientes = '/clientes';
-  static const String proveedores = '/proveedores';
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    switch (settings.name) {
+      case login:
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
 
-  // Artículos
-  static const String articulos = '/articulos';
+      case home:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            empresaId: args['empresaId'],
+            empresaNombre: args['empresaNombre'],
+          ),
+        );
 
-  // Tareas
-  static const String tareas = '/tareas';
+      case salidas:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => SalidasInventarioScreen(
+            empresaId: args['empresaId'],
+            empresaNombre: args['empresaNombre'],
+          ),
+        );
+
+      case traspasos:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => TraspasoScreen(
+            empresaId: args['empresaId'],
+            empresaNombre: args['empresaNombre'],
+          ),
+        );
+
+      default:
+        return MaterialPageRoute(
+          builder: (_) => const Scaffold(
+            body: Center(child: Text('Ruta no encontrada')),
+          ),
+        );
+    }
+  }
 }

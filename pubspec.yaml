@@ -44,6 +44,8 @@ dependencies:
   barcode: ^2.2.9
   mobile_scanner: ^6.0.2
   provider: ^6.1.5+1
+  flutter_colorpicker: ^1.0.3
+  barcode_widget: ^2.0.1
 
 dev_dependencies:
   flutter_test:

@@ -1,230 +1,76 @@
-// lib/screens/entradas/entradas_screen.dart
+// lib/screens/entradas_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/inventory_provider.dart';
 import '../../models/articulo.dart';
+import '../../providers/inventory_provider.dart';
+import '../../services/entradas_service.dart';
+import '../../widgets/etiqueta_editable_widget.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class EntradasScreen extends StatefulWidget {
   final String empresaId;
   final String empresaNombre;
 
   const EntradasScreen({
-    super.key,
+    Key? key,
     required this.empresaId,
     required this.empresaNombre,
-  });
+  }) : super(key: key);
 
   @override
-  State<EntradasScreen> createState() => _EntradasScreenState();
+  _EntradasScreenState createState() => _EntradasScreenState();
 }
 
 class _EntradasScreenState extends State<EntradasScreen> {
-  final _searchController = TextEditingController();
-  List<Articulo> _articulos = [];
-  List<Articulo> _articulosFiltrados = [];
-  bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _cantidadController = TextEditingController();
+  final EntradasService _entradasService = EntradasService();
+
+  List<Map<String, dynamic>> _carritoEntradas = [];
+
+  // Configuración de etiquetas
+  double etiquetaAncho = 300;
+  double etiquetaAlto = 150;
+  Color etiquetaFondo = Colors.white;
+  Color etiquetaTexto = Colors.black;
+  Color etiquetaBarras = Colors.black;
 
   @override
   void initState() {
     super.initState();
-    _loadArticulos();
-  }
-
-  Future<void> _loadArticulos() async {
-    final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
-    await inventoryProvider.loadArticulos(widget.empresaId);
-    
-    setState(() {
-      _articulos = inventoryProvider.articulos;
-      _articulosFiltrados = _articulos;
-      _isLoading = false;
-    });
-  }
-
-  void _filterArticulos(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _articulosFiltrados = _articulos;
-      } else {
-        _articulosFiltrados = _articulos.where((articulo) =>
-          articulo.descripcion.toLowerCase().contains(query.toLowerCase()) ||
-          articulo.codigo.toLowerCase().contains(query.toLowerCase())
-        ).toList();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<InventoryProvider>(context, listen: false);
+      provider.initializeService(widget.empresaId);
+      provider.loadArticulos(widget.empresaId);
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Entradas - ${widget.empresaNombre}'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          // Barra de búsqueda
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
+  void dispose() {
+    _searchController.dispose();
+    _cantidadController.dispose();
+    super.dispose();
+  }
+
+  void _agregarAlCarrito(Articulo articulo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Agregar ${articulo.nombre}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Stock disponible: ${articulo.stock}'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _cantidadController,
               decoration: const InputDecoration(
-                hintText: 'Buscar artículos...',
-                prefixIcon: Icon(Icons.search),
+                labelText: 'Cantidad a agregar',
                 border: OutlineInputBorder(),
               ),
-              onChanged: _filterArticulos,
+              keyboardType: TextInputType.number,
             ),
-          ),
-          
-          // Lista de artículos
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _articulosFiltrados.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No se encontraron artículos',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _articulosFiltrados.length,
-                        itemBuilder: (context, index) {
-                          final articulo = _articulosFiltrados[index];
-                          return _buildArticuloCard(articulo);
-                        },
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _mostrarDialogoEntradaMasiva(),
-        backgroundColor: Colors.green,
-        icon: const Icon(Icons.add),
-        label: const Text('Entrada Masiva'),
-      ),
-    );
-  }
-
-  Widget _buildArticuloCard(Articulo articulo) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.green.shade100,
-          child: Text(
-            articulo.codigo.substring(0, 2).toUpperCase(),
-            style: TextStyle(
-              color: Colors.green.shade800,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          articulo.descripcion,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Código: ${articulo.codigo}'),
-            Text('Stock actual: ${articulo.stock}'),
-            if (articulo.ubicacion != null)
-              Text('Ubicación: ${articulo.ubicacion}'),
           ],
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.add_circle, color: Colors.green),
-          onPressed: () => _mostrarDialogoEntrada(articulo),
-        ),
-        isThreeLine: true,
-      ),
-    );
-  }
-
-  void _mostrarDialogoEntrada(Articulo articulo) {
-    final cantidadController = TextEditingController();
-    final observacionesController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registrar Entrada'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                articulo.descripcion,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text('Código: ${articulo.codigo}'),
-              Text('Stock actual: ${articulo.stock}'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: cantidadController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Cantidad a ingresar',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: observacionesController,
-                decoration: const InputDecoration(
-                  labelText: 'Observaciones (opcional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final cantidad = int.tryParse(cantidadController.text);
-              if (cantidad != null && cantidad > 0) {
-                await _registrarEntrada(
-                  articulo,
-                  cantidad,
-                  observacionesController.text,
-                );
-                if (mounted) Navigator.pop(context);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ingrese una cantidad válida')),
-                );
-              }
-            },
-            child: const Text('Registrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _mostrarDialogoEntradaMasiva() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Entrada Masiva'),
-        content: const Text(
-          'Esta función permite registrar múltiples entradas de una vez. '
-          '¿Desea continuar?'
         ),
         actions: [
           TextButton(
@@ -233,93 +79,215 @@ class _EntradasScreenState extends State<EntradasScreen> {
           ),
           ElevatedButton(
             onPressed: () {
+              final cantidad = int.tryParse(_cantidadController.text) ?? 0;
+              if (cantidad <= 0) return;
+              setState(() {
+                _carritoEntradas.add({
+                  'articulo': articulo,
+                  'cantidad': cantidad,
+                });
+              });
+              _cantidadController.clear();
               Navigator.pop(context);
-              // Aquí se abriría una pantalla para entrada masiva
-              _mostrarPantallaEntradaMasiva();
+              _editarEtiqueta(articulo, cantidad);
             },
-            child: const Text('Continuar'),
+            child: const Text('Agregar'),
           ),
         ],
       ),
     );
   }
 
-  void _mostrarPantallaEntradaMasiva() {
-    // Por ahora mostrar un mensaje
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Función de entrada masiva en desarrollo'),
+  void _editarEtiqueta(Articulo articulo, int cantidad) {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('Configurar Etiqueta'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                for (int i = 0; i < cantidad; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: EtiquetaEditableWidget(
+                      codigoArticulo: articulo.codigoBarras ?? articulo.id!,
+                      nombreArticulo: articulo.nombre,
+                      empresa: widget.empresaNombre,
+                      ancho: etiquetaAncho,
+                      alto: etiquetaAlto,
+                      colorFondo: etiquetaFondo,
+                      colorTexto: etiquetaTexto,
+                      colorBarras: etiquetaBarras,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                _sliderConfigDialog('Ancho', etiquetaAncho, 100, 400, (v) => setStateDialog(() => etiquetaAncho = v)),
+                _sliderConfigDialog('Alto', etiquetaAlto, 100, 400, (v) => setStateDialog(() => etiquetaAlto = v)),
+                _colorPickerDialog('Fondo', etiquetaFondo, (v) => setStateDialog(() => etiquetaFondo = v)),
+                _colorPickerDialog('Texto', etiquetaTexto, (v) => setStateDialog(() => etiquetaTexto = v)),
+                _colorPickerDialog('Barras', etiquetaBarras, (v) => setStateDialog(() => etiquetaBarras = v)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cerrar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Aquí puedes agregar la funcionalidad de imprimir
+                Navigator.pop(context);
+              },
+              child: const Text('Imprimir'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _registrarEntrada(Articulo articulo, int cantidad, String observaciones) async {
-    try {
-      final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
-      final nuevoStock = articulo.stock + cantidad;
-      
-      final articuloActualizado = articulo.copyWith(stock: nuevoStock);
-      
-      final success = await inventoryProvider.updateArticulo(articuloActualizado, widget.empresaId);
-      
-      if (success) {
-        // Actualizar la lista local
-        setState(() {
-          final index = _articulos.indexWhere((a) => a.firebaseId == articulo.firebaseId);
-          if (index != -1) {
-            _articulos[index] = articuloActualizado;
-          }
-          _filterArticulos(_searchController.text);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Entrada registrada: +$cantidad unidades'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // TODO: Aquí se podría registrar el movimiento en un historial
-        _registrarMovimiento(articulo, cantidad, 'entrada', observaciones);
-      } else {
-        throw Exception('Error al actualizar el artículo');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al registrar entrada: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  Widget _sliderConfigDialog(String label, double value, double min, double max, Function(double) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${value.toInt()}'),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
+      ],
+    );
   }
 
-  Future<void> _registrarMovimiento(
-    Articulo articulo,
-    int cantidad,
-    String tipo,
-    String observaciones,
-  ) async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // TODO: Implementar servicio de movimientos
-      // Por ahora solo imprimir en consola
-      print('Movimiento registrado:');
-      print('Artículo: ${articulo.descripcion}');
-      print('Tipo: $tipo');
-      print('Cantidad: $cantidad');
-      print('Usuario: ${authProvider.currentUser?.displayName}');
-      print('Fecha: ${DateTime.now()}');
-      print('Observaciones: $observaciones');
-    } catch (e) {
-      print('Error al registrar movimiento: $e');
-    }
+  Widget _colorPickerDialog(String label, Color color, Function(Color) onColorChanged) {
+    return Row(
+      children: [
+        Text('$label: '),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () async {
+            Color? picked = await showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Seleccionar color'),
+                content: SingleChildScrollView(
+                  child: BlockPicker(
+                    pickerColor: color,
+                    onColorChanged: (c) => Navigator.pop(context, c),
+                  ),
+                ),
+              ),
+            );
+            if (picked != null) onColorChanged(picked);
+          },
+          child: Container(width: 24, height: 24, color: color),
+        ),
+      ],
+    );
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Entradas de Inventario'),
+        backgroundColor: Colors.green.shade600,
+        actions: [
+          if (_carritoEntradas.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.shopping_cart),
+              onPressed: _mostrarCarrito,
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Buscar artículo...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                final provider = Provider.of<InventoryProvider>(context, listen: false);
+                provider.searchArticulos(value, widget.empresaId);
+              },
+            ),
+          ),
+          Expanded(
+            child: Consumer<InventoryProvider>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) return const Center(child: CircularProgressIndicator());
+                if (provider.error != null) return Center(child: Text('Error: ${provider.error}'));
+                if (provider.articulos.isEmpty) return const Center(child: Text('No se encontraron artículos'));
+                return ListView.builder(
+                  itemCount: provider.articulos.length,
+                  itemBuilder: (context, index) {
+                    final articulo = provider.articulos[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: ListTile(
+                        title: Text(articulo.nombre),
+                        subtitle: Text('Stock: ${articulo.stock}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                          onPressed: () => _agregarAlCarrito(articulo),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarCarrito() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Text('Carrito de Entradas (${_carritoEntradas.length})', style: Theme.of(context).textTheme.headlineSmall),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: _carritoEntradas.length,
+                  itemBuilder: (context, index) {
+                    final item = _carritoEntradas[index];
+                    final articulo = item['articulo'] as Articulo;
+                    return Card(
+                      child: ListTile(
+                        title: Text(articulo.nombre),
+                        subtitle: Text('Cantidad: ${item['cantidad']}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            setState(() => _carritoEntradas.removeAt(index));
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

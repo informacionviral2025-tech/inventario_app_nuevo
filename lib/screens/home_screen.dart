@@ -93,9 +93,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Bienvenido,',
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
               ),
@@ -245,13 +245,27 @@ class _HomeScreenState extends State<HomeScreen> {
               'Traspasos',
               Icons.swap_horiz,
               Colors.blue,
-              () => Navigator.pushNamed(context, '/traspasos'),
+              () => Navigator.pushNamed(
+                context,
+                '/traspasos',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                  'empresaNombre': widget.empresaNombre,
+                },
+              ),
             ),
             _buildActionCard(
               'Inventario',
               Icons.inventory_2,
               Colors.purple,
-              () => Navigator.pushNamed(context, '/inventario'),
+              () => Navigator.pushNamed(
+                context,
+                '/inventario',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                  'empresaNombre': widget.empresaNombre,
+                },
+              ),
             ),
           ],
         ),
@@ -259,7 +273,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildActionCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return Card(
       elevation: 2,
       child: InkWell(
@@ -413,10 +432,24 @@ class _HomeScreenState extends State<HomeScreen> {
             // Ya estamos en inicio
             break;
           case 1:
-            Navigator.pushNamed(context, '/inventario');
+            Navigator.pushNamed(
+              context,
+              '/inventario',
+              arguments: {
+                'empresaId': widget.empresaId,
+                'empresaNombre': widget.empresaNombre,
+              },
+            );
             break;
           case 2:
-            Navigator.pushNamed(context, '/traspasos');
+            Navigator.pushNamed(
+              context,
+              '/traspasos',
+              arguments: {
+                'empresaId': widget.empresaId,
+                'empresaNombre': widget.empresaNombre,
+              },
+            );
             break;
           case 3:
             Navigator.pushNamed(context, '/ajustes');

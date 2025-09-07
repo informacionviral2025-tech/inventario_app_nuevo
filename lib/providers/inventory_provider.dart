@@ -12,20 +12,20 @@ class InventoryProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Inicializar el provider con el empresaId
+  // Inicializar el servicio
   void initializeService(String empresaId) {
     _articuloService = ArticuloService(empresaId);
   }
 
   // Cargar artículos
   Future<void> loadArticulos(String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
-    
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    if (_articuloService == null) {
+      initializeService(empresaId);
+    }
 
     try {
       _articulos = await _articuloService.getArticulos();
@@ -39,16 +39,12 @@ class InventoryProvider extends ChangeNotifier {
 
   // Agregar artículo
   Future<bool> addArticulo(Articulo articulo, String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
+    if (_articuloService == null) initializeService(empresaId);
 
     try {
-      final success = await _articuloService.addArticulo(articulo);
-      if (success) {
-        await loadArticulos(empresaId);
-      }
-      return success;
+      await _articuloService.addArticulo(articulo);
+      await loadArticulos(empresaId);
+      return true;
     } catch (e) {
       _error = 'Error al agregar artículo: $e';
       notifyListeners();
@@ -58,16 +54,12 @@ class InventoryProvider extends ChangeNotifier {
 
   // Actualizar artículo
   Future<bool> updateArticulo(Articulo articulo, String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
+    if (_articuloService == null) initializeService(empresaId);
 
     try {
-      final success = await _articuloService.updateArticulo(articulo);
-      if (success) {
-        await loadArticulos(empresaId);
-      }
-      return success;
+      await _articuloService.updateArticulo(articulo);
+      await loadArticulos(empresaId);
+      return true;
     } catch (e) {
       _error = 'Error al actualizar artículo: $e';
       notifyListeners();
@@ -77,16 +69,12 @@ class InventoryProvider extends ChangeNotifier {
 
   // Eliminar artículo
   Future<bool> deleteArticulo(String articuloId, String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
+    if (_articuloService == null) initializeService(empresaId);
 
     try {
-      final success = await _articuloService.deleteArticulo(articuloId);
-      if (success) {
-        await loadArticulos(empresaId);
-      }
-      return success;
+      await _articuloService.deleteArticulo(articuloId);
+      await loadArticulos(empresaId);
+      return true;
     } catch (e) {
       _error = 'Error al eliminar artículo: $e';
       notifyListeners();
@@ -96,9 +84,7 @@ class InventoryProvider extends ChangeNotifier {
 
   // Buscar artículos
   Future<void> searchArticulos(String query, String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
+    if (_articuloService == null) initializeService(empresaId);
 
     _isLoading = true;
     _error = null;
@@ -120,29 +106,18 @@ class InventoryProvider extends ChangeNotifier {
 
   // Actualizar stock
   Future<bool> updateStock(String articuloId, int nuevoStock, String empresaId) async {
-    if (_articuloService == null) {
-      initializeService(empresaId);
-    }
+    if (_articuloService == null) initializeService(empresaId);
 
     try {
       final articulo = _articulos.firstWhere((a) => a.id == articuloId);
-      final articuloActualizado = Articulo(
-        id: articulo.id,
-        nombre: articulo.nombre,
-        descripcion: articulo.descripcion,
-        precio: articulo.precio,
+      final articuloActualizado = articulo.copyWith(
         stock: nuevoStock,
-        categoria: articulo.categoria,
-        codigoBarras: articulo.codigoBarras,
-        fechaCreacion: articulo.fechaCreacion,
         fechaActualizacion: DateTime.now(),
       );
 
-      final success = await _articuloService.updateArticulo(articuloActualizado);
-      if (success) {
-        await loadArticulos(empresaId);
-      }
-      return success;
+      await _articuloService.updateArticulo(articuloActualizado);
+      await loadArticulos(empresaId);
+      return true;
     } catch (e) {
       _error = 'Error al actualizar stock: $e';
       notifyListeners();
@@ -160,9 +135,7 @@ class InventoryProvider extends ChangeNotifier {
   }
 
   // Obtener stock total
-  int get totalStock {
-    return _articulos.fold<int>(0, (sum, articulo) => sum + articulo.stock.toInt());
-  }
+  int get totalStock => _articulos.fold<int>(0, (sum, articulo) => sum + articulo.stock);
 
   // Limpiar errores
   void clearError() {
