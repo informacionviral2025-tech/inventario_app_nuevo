@@ -1,54 +1,112 @@
-// lib/routes/app_routes.dart
+// lib/utils/app_router.dart
 import 'package:flutter/material.dart';
-import '../screens/home_screen.dart';
-import '../screens/login_screen.dart';
-import '../screens/salidas_inventario_screen.dart';
-import '../screens/traspasos/traspaso_screen.dart';
 
-class AppRoutes {
-  static const String login = '/login';
-  static const String home = '/home';
-  static const String salidas = '/salidas';
-  static const String traspasos = '/traspasos';
+class AppRouter {
+  static void goToHome(BuildContext context, String empresaId) {
+    Navigator.pushReplacementNamed(
+      context, 
+      '/home',
+      arguments: {'empresaId': empresaId},
+    );
+  }
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case login:
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
+  static void goToLogin(BuildContext context) {
+    Navigator.pushReplacementNamed(context, '/login');
+  }
 
-      case home:
-        final args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          builder: (_) => HomeScreen(
-            empresaId: args['empresaId'],
-            empresaNombre: args['empresaNombre'],
-          ),
-        );
+  static void goToArticulos(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/articulos',
+      arguments: {'empresaId': empresaId},
+    );
+  }
 
-      case salidas:
-        final args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          builder: (_) => SalidasInventarioScreen(
-            empresaId: args['empresaId'],
-            empresaNombre: args['empresaNombre'],
-          ),
-        );
+  static void goToEntradas(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/entradas',
+      arguments: {'empresaId': empresaId},
+    );
+  }
 
-      case traspasos:
-        final args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          builder: (_) => TraspasoScreen(
-            empresaId: args['empresaId'],
-            empresaNombre: args['empresaNombre'],
-          ),
-        );
+  static void goToSalidas(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/salidas',
+      arguments: {'empresaId': empresaId},
+    );
+  }
 
-      default:
-        return MaterialPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('Ruta no encontrada')),
-          ),
-        );
+  static void goToTraspasos(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/traspasos',
+      arguments: {'empresaId': empresaId},
+    );
+  }
+
+  static void goToReportes(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/reportes',
+      arguments: {'empresaId': empresaId},
+    );
+  }
+
+  static void goToNuevoArticulo(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/nuevo_articulo',
+      arguments: {'empresaId': empresaId},
+    );
+  }
+
+  static void goToEditarArticulo(BuildContext context, String empresaId, String articuloId) {
+    Navigator.pushNamed(
+      context, 
+      '/editar_articulo',
+      arguments: {
+        'empresaId': empresaId,
+        'articuloId': articuloId,
+      },
+    );
+  }
+
+  static void goToNuevoTraspaso(BuildContext context, String empresaId) {
+    Navigator.pushNamed(
+      context, 
+      '/nuevo_traspaso',
+      arguments: {'empresaId': empresaId},
+    );
+  }
+
+  static void goBack(BuildContext context) {
+    Navigator.pop(context);
+  }
+
+  static void goToSettings(BuildContext context) {
+    Navigator.pushNamed(context, '/settings');
+  }
+
+  // Método para extraer empresaId de los argumentos
+  static String? getEmpresaId(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      return args['empresaId'] as String?;
     }
+    if (args is String) {
+      return args;
+    }
+    return null;
+  }
+
+  // Método para extraer argumentos
+  static Map<String, dynamic>? getArguments(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      return args;
+    }
+    return null;
   }
 }

@@ -1,205 +1,182 @@
 // lib/models/traspaso.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-enum EstadoTraspaso {
-  pendiente,
-  enviado,
-  recibido,
-  completado,
-  cancelado
-}
-
-extension EstadoTraspasoExtension on EstadoTraspaso {
-  String toUpperCase() {
-    switch (this) {
-      case EstadoTraspaso.pendiente:
-        return 'PENDIENTE';
-      case EstadoTraspaso.enviado:
-        return 'ENVIADO';
-      case EstadoTraspaso.recibido:
-        return 'RECIBIDO';
-      case EstadoTraspaso.completado:
-        return 'COMPLETADO';
-      case EstadoTraspaso.cancelado:
-        return 'CANCELADO';
-    }
-  }
-
-  String get displayName {
-    switch (this) {
-      case EstadoTraspaso.pendiente:
-        return 'Pendiente';
-      case EstadoTraspaso.enviado:
-        return 'Enviado';
-      case EstadoTraspaso.recibido:
-        return 'Recibido';
-      case EstadoTraspaso.completado:
-        return 'Completado';
-      case EstadoTraspaso.cancelado:
-        return 'Cancelado';
-    }
-  }
-}
-
 class Traspaso {
-  String? id;
+  final String? id;
   final String empresaId;
-  final String tipoOrigen;  // 'almacen' o 'obra'
-  final String origenId;
-  final String tipoDestino; // 'almacen' o 'obra'
-  final String destinoId;
+  final String ubicacionOrigen;
+  final String ubicacionDestino;
   final Map<String, int> articulos; // articuloId -> cantidad
-  final EstadoTraspaso estado;
-  final String usuario;
-  final DateTime fecha;
-  final DateTime? fechaConfirmacion;
-  final String? albaranId;
   final String? observaciones;
+  final String estado; // 'pendiente', 'en_transito', 'completado', 'cancelado'
+  final DateTime fecha;
+  final DateTime? fechaModificacion;
+  final DateTime? fechaRecepcion;
+  final DateTime? fechaCancelacion;
+  final Map<String, int>? cantidadesRecibidas;
+  final String? motivoCancelacion;
+  final String? usuarioCreador;
+  final String? usuarioReceptor;
 
   Traspaso({
     this.id,
     required this.empresaId,
-    required this.tipoOrigen,
-    required this.origenId,
-    required this.tipoDestino,
-    required this.destinoId,
+    required this.ubicacionOrigen,
+    required this.ubicacionDestino,
     required this.articulos,
-    this.estado = EstadoTraspaso.pendiente,
-    required this.usuario,
-    required this.fecha,
-    this.fechaConfirmacion,
-    this.albaranId,
     this.observaciones,
+    this.estado = 'pendiente',
+    required this.fecha,
+    this.fechaModificacion,
+    this.fechaRecepcion,
+    this.fechaCancelacion,
+    this.cantidadesRecibidas,
+    this.motivoCancelacion,
+    this.usuarioCreador,
+    this.usuarioReceptor,
   });
 
-  // Constructor desde Firestore
-  factory Traspaso.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    
-    // Convertir el mapa de artículos
-    Map<String, int> articulos = {};
-    if (data['articulos'] != null) {
-      final articulosData = data['articulos'] as Map<String, dynamic>;
-      articulos = articulosData.map((key, value) => MapEntry(key, value as int));
-    }
-
-    // Convertir el estado
-    EstadoTraspaso estado = EstadoTraspaso.pendiente;
-    if (data['estado'] != null) {
-      final estadoString = data['estado'] as String;
-      switch (estadoString.toLowerCase()) {
-        case 'pendiente':
-          estado = EstadoTraspaso.pendiente;
-          break;
-        case 'enviado':
-          estado = EstadoTraspaso.enviado;
-          break;
-        case 'recibido':
-          estado = EstadoTraspaso.recibido;
-          break;
-        case 'completado':
-          estado = EstadoTraspaso.completado;
-          break;
-        case 'cancelado':
-          estado = EstadoTraspaso.cancelado;
-          break;
-      }
-    }
-
-    return Traspaso(
-      id: doc.id,
-      empresaId: data['empresaId'] ?? '',
-      tipoOrigen: data['tipoOrigen'] ?? '',
-      origenId: data['origenId'] ?? '',
-      tipoDestino: data['tipoDestino'] ?? '',
-      destinoId: data['destinoId'] ?? '',
-      articulos: articulos,
-      estado: estado,
-      usuario: data['usuario'] ?? '',
-      fecha: data['fecha'] != null 
-          ? (data['fecha'] as Timestamp).toDate()
-          : DateTime.now(),
-      fechaConfirmacion: data['fechaConfirmacion'] != null
-          ? (data['fechaConfirmacion'] as Timestamp).toDate()
-          : null,
-      albaranId: data['albaranId'],
-      observaciones: data['observaciones'],
-    );
-  }
-
-  // Convertir a Firestore
-  Map<String, dynamic> toFirestore() {
+  // Método toMap para Firestore
+  Map<String, dynamic> toMap() {
     return {
       'empresaId': empresaId,
-      'tipoOrigen': tipoOrigen,
-      'origenId': origenId,
-      'tipoDestino': tipoDestino,
-      'destinoId': destinoId,
+      'ubicacionOrigen': ubicacionOrigen,
+      'ubicacionDestino': ubicacionDestino,
       'articulos': articulos,
-      'estado': estado.name,
-      'usuario': usuario,
-      'fecha': Timestamp.fromDate(fecha),
-      'fechaConfirmacion': fechaConfirmacion != null
-          ? Timestamp.fromDate(fechaConfirmacion!)
-          : null,
-      'albaranId': albaranId,
       'observaciones': observaciones,
+      'estado': estado,
+      'fecha': fecha.millisecondsSinceEpoch,
+      'fechaModificacion': fechaModificacion?.millisecondsSinceEpoch,
+      'fechaRecepcion': fechaRecepcion?.millisecondsSinceEpoch,
+      'fechaCancelacion': fechaCancelacion?.millisecondsSinceEpoch,
+      'cantidadesRecibidas': cantidadesRecibidas,
+      'motivoCancelacion': motivoCancelacion,
+      'usuarioCreador': usuarioCreador,
+      'usuarioReceptor': usuarioReceptor,
     };
   }
 
-  // CopyWith para crear copias modificadas
+  // Factory constructor desde Map
+  factory Traspaso.fromMap(Map<String, dynamic> map, [String? docId]) {
+    return Traspaso(
+      id: docId ?? map['id'],
+      empresaId: map['empresaId'] ?? '',
+      ubicacionOrigen: map['ubicacionOrigen'] ?? '',
+      ubicacionDestino: map['ubicacionDestino'] ?? '',
+      articulos: Map<String, int>.from(map['articulos'] ?? {}),
+      observaciones: map['observaciones'],
+      estado: map['estado'] ?? 'pendiente',
+      fecha: map['fecha'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fecha'])
+          : DateTime.now(),
+      fechaModificacion: map['fechaModificacion'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fechaModificacion'])
+          : null,
+      fechaRecepcion: map['fechaRecepcion'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fechaRecepcion'])
+          : null,
+      fechaCancelacion: map['fechaCancelacion'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fechaCancelacion'])
+          : null,
+      cantidadesRecibidas: map['cantidadesRecibidas'] != null 
+          ? Map<String, int>.from(map['cantidadesRecibidas'])
+          : null,
+      motivoCancelacion: map['motivoCancelacion'],
+      usuarioCreador: map['usuarioCreador'],
+      usuarioReceptor: map['usuarioReceptor'],
+    );
+  }
+
+  // Método copyWith
   Traspaso copyWith({
     String? id,
     String? empresaId,
-    String? tipoOrigen,
-    String? origenId,
-    String? tipoDestino,
-    String? destinoId,
+    String? ubicacionOrigen,
+    String? ubicacionDestino,
     Map<String, int>? articulos,
-    EstadoTraspaso? estado,
-    String? usuario,
-    DateTime? fecha,
-    DateTime? fechaConfirmacion,
-    String? albaranId,
     String? observaciones,
+    String? estado,
+    DateTime? fecha,
+    DateTime? fechaModificacion,
+    DateTime? fechaRecepcion,
+    DateTime? fechaCancelacion,
+    Map<String, int>? cantidadesRecibidas,
+    String? motivoCancelacion,
+    String? usuarioCreador,
+    String? usuarioReceptor,
   }) {
     return Traspaso(
       id: id ?? this.id,
       empresaId: empresaId ?? this.empresaId,
-      tipoOrigen: tipoOrigen ?? this.tipoOrigen,
-      origenId: origenId ?? this.origenId,
-      tipoDestino: tipoDestino ?? this.tipoDestino,
-      destinoId: destinoId ?? this.destinoId,
-      articulos: articulos ?? Map.from(this.articulos),
-      estado: estado ?? this.estado,
-      usuario: usuario ?? this.usuario,
-      fecha: fecha ?? this.fecha,
-      fechaConfirmacion: fechaConfirmacion ?? this.fechaConfirmacion,
-      albaranId: albaranId ?? this.albaranId,
+      ubicacionOrigen: ubicacionOrigen ?? this.ubicacionOrigen,
+      ubicacionDestino: ubicacionDestino ?? this.ubicacionDestino,
+      articulos: articulos ?? this.articulos,
       observaciones: observaciones ?? this.observaciones,
+      estado: estado ?? this.estado,
+      fecha: fecha ?? this.fecha,
+      fechaModificacion: fechaModificacion ?? this.fechaModificacion,
+      fechaRecepcion: fechaRecepcion ?? this.fechaRecepcion,
+      fechaCancelacion: fechaCancelacion ?? this.fechaCancelacion,
+      cantidadesRecibidas: cantidadesRecibidas ?? this.cantidadesRecibidas,
+      motivoCancelacion: motivoCancelacion ?? this.motivoCancelacion,
+      usuarioCreador: usuarioCreador ?? this.usuarioCreador,
+      usuarioReceptor: usuarioReceptor ?? this.usuarioReceptor,
     );
   }
 
-  // Propiedades computadas
-  bool get isPendiente => estado == EstadoTraspaso.pendiente;
-  bool get isEnviado => estado == EstadoTraspaso.enviado;
-  bool get isRecibido => estado == EstadoTraspaso.recibido;
-  bool get isCompletado => estado == EstadoTraspaso.completado;
-  bool get isCancelado => estado == EstadoTraspaso.cancelado;
+  // Getters de utilidad
+  int get totalArticulos => articulos.length;
+  
+  int get totalCantidad => articulos.values.fold(0, (sum, cantidad) => sum + cantidad);
+  
+  bool get estaCompletado => estado == 'completado';
+  
+  bool get estaCancelado => estado == 'cancelado';
+  
+  bool get estaPendiente => estado == 'pendiente';
+  
+  bool get estaEnTransito => estado == 'en_transito';
 
-  int get totalArticulos => articulos.values.fold(0, (sum, cantidad) => sum + cantidad);
+  // Método para obtener el color según el estado
+  String get colorEstado {
+    switch (estado) {
+      case 'pendiente':
+        return 'orange';
+      case 'en_transito':
+        return 'blue';
+      case 'completado':
+        return 'green';
+      case 'cancelado':
+        return 'red';
+      default:
+        return 'grey';
+    }
+  }
 
-  @override
-  String toString() {
-    return 'Traspaso{id: $id, estado: $estado, totalArticulos: $totalArticulos}';
+  // Método para obtener el texto del estado
+  String get textoEstado {
+    switch (estado) {
+      case 'pendiente':
+        return 'Pendiente';
+      case 'en_transito':
+        return 'En Tránsito';
+      case 'completado':
+        return 'Completado';
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return 'Desconocido';
+    }
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Traspaso &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+  String toString() {
+    return 'Traspaso(id: $id, origen: $ubicacionOrigen, destino: $ubicacionDestino, estado: $estado)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Traspaso && other.id == id;
+  }
 
   @override
   int get hashCode => id.hashCode;

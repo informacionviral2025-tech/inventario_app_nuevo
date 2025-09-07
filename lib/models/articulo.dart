@@ -1,154 +1,127 @@
 // lib/models/articulo.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Articulo {
+  final String? id;
   final String? firebaseId;
-  final int? localId;
-  final String nombre;
-  final String? descripcion;
-  final double precio;
+  final String codigo;
+  final String descripcion;
   final int stock;
-  final String? codigoBarras;
+  final double? precio;
   final String? categoria;
-  final String empresaId;
-  final String? unidadMedida;
-  final double? stockMinimo;
-  final double? stockMaximo;
-  final bool activo;
-  final DateTime fechaCreacion;
-  final DateTime fechaActualizacion;
-
-  // Campos adicionales
-  final String? codigo;
-  final String? sku;
-  final double? precioCosto;
-  final String? unidad;
+  final int? stockMinimo;
+  final String? ubicacion;
+  final bool? activo;
+  final DateTime? fechaCreacion;
+  final DateTime? fechaModificacion;
+  final String? empresaId;
 
   Articulo({
+    this.id,
     this.firebaseId,
-    this.localId,
-    required this.nombre,
-    this.descripcion,
-    required this.precio,
+    required this.codigo,
+    required this.descripcion,
     required this.stock,
-    this.codigoBarras,
+    this.precio,
     this.categoria,
-    required this.empresaId,
-    this.unidadMedida,
     this.stockMinimo,
-    this.stockMaximo,
+    this.ubicacion,
     this.activo = true,
-    required this.fechaCreacion,
-    required this.fechaActualizacion,
-    this.codigo,
-    this.sku,
-    this.precioCosto,
-    this.unidad,
+    this.fechaCreacion,
+    this.fechaModificacion,
+    this.empresaId,
   });
 
-  // Getter para compatibilidad
-  String get id => localId?.toString() ?? firebaseId ?? '';
+  // Getters de compatibilidad
+  String get nombre => descripcion; // Para compatibilidad con código existente
+  String? get codigoBarras => codigo; // Para compatibilidad con código existente
 
-  // Getters de conveniencia
-  bool get stockBajo => stockMinimo != null && stock <= stockMinimo!;
-  bool get necesitaReabastecimiento => stockBajo;
-  bool get tieneStock => stock > 0;
-  double get valorInventario => stock * (precioCosto ?? precio);
-
-  // Factory desde Firestore
-  factory Articulo.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Articulo(
-      firebaseId: doc.id,
-      nombre: data['nombre'] ?? '',
-      descripcion: data['descripcion'],
-      precio: (data['precio'] ?? 0.0).toDouble(),
-      stock: data['stock'] ?? 0,
-      codigoBarras: data['codigoBarras'],
-      categoria: data['categoria'],
-      empresaId: data['empresaId'] ?? '',
-      unidadMedida: data['unidadMedida'],
-      stockMinimo: data['stockMinimo']?.toDouble(),
-      stockMaximo: data['stockMaximo']?.toDouble(),
-      activo: data['activo'] ?? true,
-      fechaCreacion: data['fechaCreacion'] is Timestamp
-          ? (data['fechaCreacion'] as Timestamp).toDate()
-          : DateTime.now(),
-      fechaActualizacion: data['fechaActualizacion'] is Timestamp
-          ? (data['fechaActualizacion'] as Timestamp).toDate()
-          : DateTime.now(),
-      codigo: data['codigo'],
-      sku: data['sku'],
-      precioCosto: data['precioCosto']?.toDouble(),
-      unidad: data['unidad'],
-    );
-  }
-
-  // Convertir a Firestore
-  Map<String, dynamic> toFirestore() {
+  // Método toMap para Firestore
+  Map<String, dynamic> toMap() {
     return {
-      'nombre': nombre,
-      'descripcion': descripcion,
-      'precio': precio,
-      'stock': stock,
-      'codigoBarras': codigoBarras,
-      'categoria': categoria,
-      'empresaId': empresaId,
-      'unidadMedida': unidadMedida,
-      'stockMinimo': stockMinimo,
-      'stockMaximo': stockMaximo,
-      'activo': activo,
-      'fechaCreacion': Timestamp.fromDate(fechaCreacion),
-      'fechaActualizacion': Timestamp.fromDate(fechaActualizacion),
+      'id': id,
+      'firebaseId': firebaseId,
       'codigo': codigo,
-      'sku': sku,
-      'precioCosto': precioCosto,
-      'unidad': unidad,
+      'descripcion': descripcion,
+      'stock': stock,
+      'precio': precio,
+      'categoria': categoria,
+      'stockMinimo': stockMinimo,
+      'ubicacion': ubicacion,
+      'activo': activo ?? true,
+      'fechaCreacion': fechaCreacion?.millisecondsSinceEpoch,
+      'fechaModificacion': fechaModificacion?.millisecondsSinceEpoch,
+      'empresaId': empresaId,
     };
   }
 
-  // CopyWith
-  Articulo copyWith({
-    String? firebaseId,
-    int? localId,
-    String? nombre,
-    String? descripcion,
-    double? precio,
-    int? stock,
-    String? codigoBarras,
-    String? categoria,
-    String? empresaId,
-    String? unidadMedida,
-    double? stockMinimo,
-    double? stockMaximo,
-    bool? activo,
-    DateTime? fechaCreacion,
-    DateTime? fechaActualizacion,
-    String? codigo,
-    String? sku,
-    double? precioCosto,
-    String? unidad,
-  }) {
+  // Factory constructor desde Map
+  factory Articulo.fromMap(Map<String, dynamic> map, [String? docId]) {
     return Articulo(
-      firebaseId: firebaseId ?? this.firebaseId,
-      localId: localId ?? this.localId,
-      nombre: nombre ?? this.nombre,
-      descripcion: descripcion ?? this.descripcion,
-      precio: precio ?? this.precio,
-      stock: stock ?? this.stock,
-      codigoBarras: codigoBarras ?? this.codigoBarras,
-      categoria: categoria ?? this.categoria,
-      empresaId: empresaId ?? this.empresaId,
-      unidadMedida: unidadMedida ?? this.unidadMedida,
-      stockMinimo: stockMinimo ?? this.stockMinimo,
-      stockMaximo: stockMaximo ?? this.stockMaximo,
-      activo: activo ?? this.activo,
-      fechaCreacion: fechaCreacion ?? this.fechaCreacion,
-      fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
-      codigo: codigo ?? this.codigo,
-      sku: sku ?? this.sku,
-      precioCosto: precioCosto ?? this.precioCosto,
-      unidad: unidad ?? this.unidad,
+      id: map['id'] ?? docId,
+      firebaseId: docId ?? map['firebaseId'],
+      codigo: map['codigo'] ?? '',
+      descripcion: map['descripcion'] ?? '',
+      stock: map['stock']?.toInt() ?? 0,
+      precio: map['precio']?.toDouble(),
+      categoria: map['categoria'],
+      stockMinimo: map['stockMinimo']?.toInt(),
+      ubicacion: map['ubicacion'],
+      activo: map['activo'] ?? true,
+      fechaCreacion: map['fechaCreacion'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fechaCreacion'])
+          : null,
+      fechaModificacion: map['fechaModificacion'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(map['fechaModificacion'])
+          : null,
+      empresaId: map['empresaId'],
     );
   }
+
+  // Método copyWith
+  Articulo copyWith({
+    String? id,
+    String? firebaseId,
+    String? codigo,
+    String? descripcion,
+    int? stock,
+    double? precio,
+    String? categoria,
+    int? stockMinimo,
+    String? ubicacion,
+    bool? activo,
+    DateTime? fechaCreacion,
+    DateTime? fechaModificacion,
+    String? empresaId,
+  }) {
+    return Articulo(
+      id: id ?? this.id,
+      firebaseId: firebaseId ?? this.firebaseId,
+      codigo: codigo ?? this.codigo,
+      descripcion: descripcion ?? this.descripcion,
+      stock: stock ?? this.stock,
+      precio: precio ?? this.precio,
+      categoria: categoria ?? this.categoria,
+      stockMinimo: stockMinimo ?? this.stockMinimo,
+      ubicacion: ubicacion ?? this.ubicacion,
+      activo: activo ?? this.activo,
+      fechaCreacion: fechaCreacion ?? this.fechaCreacion,
+      fechaModificacion: fechaModificacion ?? this.fechaModificacion,
+      empresaId: empresaId ?? this.empresaId,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Articulo(id: $id, codigo: $codigo, descripcion: $descripcion, stock: $stock)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Articulo &&
+        other.id == id &&
+        other.codigo == codigo;
+  }
+
+  @override
+  int get hashCode => id.hashCode ^ codigo.hashCode;
 }
