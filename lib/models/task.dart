@@ -1,85 +1,100 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum TaskPriority { urgente, alta, media, baja }
-enum TaskSection { taller, almacen, obra }
+enum TaskStatus {
+  pendiente,
+  enProgreso,
+  completada,
+  cancelada
+}
+
+enum TaskPriority {
+  baja,
+  media,
+  alta,
+  critica
+}
 
 class Task {
   final String id;
-  String titulo;
-  String? descripcion;
-  TaskPriority prioridad;
-  TaskSection seccion;
-  DateTime fechaCreacion;
-  DateTime? fechaLimite;
-  bool completada;
+  final String titulo;
+  final String descripcion;
+  final DateTime fechaVencimiento;
+  final TaskPriority prioridad;
+  final String asignadoA;
+  final TaskStatus estado;
+  final DateTime fechaCreacion;
+  final DateTime? fechaCompletada;
 
   Task({
     required this.id,
     required this.titulo,
-    this.descripcion,
+    required this.descripcion,
+    required this.fechaVencimiento,
     required this.prioridad,
-    required this.seccion,
+    required this.asignadoA,
+    required this.estado,
     required this.fechaCreacion,
-    this.fechaLimite,
-    this.completada = false,
+    this.fechaCompletada,
   });
 
-  // ======= PERSISTENCIA =======
-  factory Task.fromJson(Map<String, dynamic> json) {
+  factory Task.fromMap(Map<String, dynamic> map, String id) {
     return Task(
-      id: json['id'] as String,
-      titulo: json['titulo'] as String,
-      descripcion: json['descripcion'] as String?,
-      prioridad: TaskPriority.values[json['prioridad'] as int],
-      seccion: TaskSection.values[json['seccion'] as int],
-      fechaCreacion: DateTime.parse(json['fechaCreacion'] as String),
-      fechaLimite: json['fechaLimite'] != null ? DateTime.parse(json['fechaLimite'] as String) : null,
-      completada: json['completada'] as bool? ?? false,
+      id: id,
+      titulo: map['titulo'] ?? '',
+      descripcion: map['descripcion'] ?? '',
+      fechaVencimiento: (map['fechaVencimiento'] as Timestamp).toDate(),
+      prioridad: TaskPriority.values.firstWhere(
+        (p) => p.toString().split('.').last == map['prioridad'],
+        orElse: () => TaskPriority.media,
+      ),
+      asignadoA: map['asignadoA'] ?? '',
+      estado: TaskStatus.values.firstWhere(
+        (s) => s.toString().split('.').last == map['estado'],
+        orElse: () => TaskStatus.pendiente,
+      ),
+      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
+      fechaCompletada: map['fechaCompletada'] != null 
+          ? (map['fechaCompletada'] as Timestamp).toDate()
+          : null,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'titulo': titulo,
-        'descripcion': descripcion,
-        'prioridad': prioridad.index,
-        'seccion': seccion.index,
-        'fechaCreacion': fechaCreacion.toIso8601String(),
-        'fechaLimite': fechaLimite?.toIso8601String(),
-        'completada': completada,
-      };
-
-  static String encodeList(List<Task> tasks) =>
-      jsonEncode(tasks.map((t) => t.toJson()).toList());
-
-  static List<Task> decodeList(String source) {
-    final list = (jsonDecode(source) as List).cast<Map<String, dynamic>>();
-    return list.map((m) => Task.fromJson(m)).toList();
+  Map<String, dynamic> toMap() {
+    return {
+      'titulo': titulo,
+      'descripcion': descripcion,
+      'fechaVencimiento': Timestamp.fromDate(fechaVencimiento),
+      'prioridad': prioridad.toString().split('.').last,
+      'asignadoA': asignadoA,
+      'estado': estado.toString().split('.').last,
+      'fechaCreacion': Timestamp.fromDate(fechaCreacion),
+      'fechaCompletada': fechaCompletada != null 
+          ? Timestamp.fromDate(fechaCompletada!)
+          : null,
+    };
   }
 
-  // ======= PROPIEDADES CALCULADAS =======
-  Duration? get tiempoRestante =>
-      fechaLimite != null ? fechaLimite!.difference(DateTime.now()) : null;
-
-  String get tiempoRestanteTexto {
-    if (fechaLimite == null) return 'Sin fecha límite';
-    final diff = tiempoRestante!;
-    if (diff.isNegative) return '⏰ Vencida';
-    if (diff.inHours < 24) return '⚠️ Menos de 24h';
-    return '${diff.inDays} días restantes';
-  }
-
-  Color get colorPrioridad {
-    switch (prioridad) {
-      case TaskPriority.urgente:
-        return Colors.red;
-      case TaskPriority.alta:
-        return Colors.orange;
-      case TaskPriority.media:
-        return Colors.blue;
-      case TaskPriority.baja:
-        return Colors.green;
-    }
+  Task copyWith({
+    String? id,
+    String? titulo,
+    String? descripcion,
+    DateTime? fechaVencimiento,
+    TaskPriority? prioridad,
+    String? asignadoA,
+    TaskStatus? estado,
+    DateTime? fechaCreacion,
+    DateTime? fechaCompletada,
+  }) {
+    return Task(
+      id: id ?? this.id,
+      titulo: titulo ?? this.titulo,
+      descripcion: descripcion ?? this.descripcion,
+      fechaVencimiento: fechaVencimiento ?? this.fechaVencimiento,
+      prioridad: prioridad ?? this.prioridad,
+      asignadoA: asignadoA ?? this.asignadoA,
+      estado: estado ?? this.estado,
+      fechaCreacion: fechaCreacion ?? this.fechaCreacion,
+      fechaCompletada: fechaCompletada ?? this.fechaCompletada,
+    );
   }
 }
