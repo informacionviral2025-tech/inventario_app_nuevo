@@ -5,7 +5,7 @@ import '../../models/obra.dart';
 import '../../services/obra_service.dart';
 import '../albaranes/lista_albaranes_screen.dart';
 import '../articulos/articulos_por_obra_screen.dart';
-import '../tareas/tareas_obra_screen.dart';
+import '../tasks/tareas_obra_screen.dart';
 import 'editar_obra_screen.dart';
 
 class ObraDetailScreen extends StatefulWidget {

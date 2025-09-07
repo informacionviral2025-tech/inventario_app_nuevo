@@ -1,402 +1,103 @@
-// lib/screens/login_screen.dart - VERSIÓN CORREGIDA COMPLETA
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+import '../security/permissions.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class AuthProvider extends ChangeNotifier {
+  bool _isAuthenticated = false;
+  bool _isLoading = false;
+  String? _currentUsername;
+  String? _errorMessage;
+  UserRole _currentRole = UserRole.usuarioBasico;
 
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isLoading => _isLoading;
+  String? get currentUsername => _currentUsername;
+  String? get errorMessage => _errorMessage;
+  UserRole get currentRole => _currentRole;
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController usuarioController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    usuarioController.dispose();
-    passwordController.dispose();
-    super.dispose();
+  /// Debug helper
+  void debugCurrentState() {
+    debugPrint('AuthProvider => '
+        'isAuthenticated=$_isAuthenticated, '
+        'isLoading=$_isLoading, '
+        'currentUsername=$_currentUsername, '
+        'role=$_currentRole');
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade800, Colors.blue.shade600],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Consumer<AuthProvider>(
-                    builder: (context, authProvider, child) {
-                      return Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Logo o título
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade100,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.inventory_2,
-                                size: 48,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Gestión de Inventario',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Inicia sesión para continuar',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
+  /// Login con validación de credenciales reales (ejemplo simulado)
+  Future<bool> loginWithUsername(String username, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
-                            // Mostrar error si existe
-                            if (authProvider.errorMessage != null) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.shade200),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.error_outline, color: Colors.red.shade600),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        authProvider.errorMessage!,
-                                        style: TextStyle(
-                                          color: Colors.red.shade700,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
+    await Future.delayed(const Duration(seconds: 1)); // Simular delay
 
-                            // Campo Usuario
-                            TextFormField(
-                              controller: usuarioController,
-                              decoration: InputDecoration(
-                                labelText: 'Usuario',
-                                prefixIcon: const Icon(Icons.person),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
-                              ),
-                              textInputAction: TextInputAction.next,
-                              enabled: !authProvider.isLoading,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Por favor ingresa tu usuario';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Campo Contraseña
-                            TextFormField(
-                              controller: passwordController,
-                              decoration: InputDecoration(
-                                labelText: 'Contraseña',
-                                prefixIcon: const Icon(Icons.lock),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
-                              ),
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.done,
-                              enabled: !authProvider.isLoading,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Por favor ingresa tu contraseña';
-                                }
-                                return null;
-                              },
-                              onFieldSubmitted: (_) => _login(),
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Botón de login
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton(
-                                onPressed: authProvider.isLoading ? null : _login,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue.shade700,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: authProvider.isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Iniciar Sesión',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Botón de testing (solo en modo debug)
-                            if (kDebugMode) ...[
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: authProvider.isLoading ? null : _testLogin,
-                                  child: const Text('Test Login (Debug)'),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Información de usuarios de prueba
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Usuarios de prueba:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'admin/admin123\ngerente/gerente123\nempleado/empleado123\nsupervisor/supervisor123\nalmacenero/almacen123',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Debug info (solo en modo debug)
-                            if (kDebugMode) ...[
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.shade200),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      'Debug Info:',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.orange.shade700,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Auth: ${authProvider.isAuthenticated ? "✅" : "❌"}\n'
-                                      'Loading: ${authProvider.isLoading ? "⏳" : "✅"}\n'
-                                      'User: ${authProvider.currentUsername ?? "null"}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.orange.shade600,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final username = usuarioController.text.trim();
-    final password = passwordController.text.trim();
-
-    debugPrint('=== INICIANDO LOGIN DESDE UI ===');
-    debugPrint('Usuario: $username');
-    debugPrint('Contraseña length: ${password.length}');
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // Mostrar estado actual para debugging
-      authProvider.debugCurrentState();
-      
-      final success = await authProvider.loginWithUsername(username, password);
-
-      debugPrint('Resultado login: $success');
-
-      if (success) {
-        debugPrint('✅ Login exitoso, navegando...');
-        
-        // Verificar si el widget sigue montado antes de navegar
-        if (mounted) {
-          // Navegar a la siguiente pantalla
-          Navigator.of(context).pushReplacementNamed('/empresa-selection');
-        }
-      } else {
-        debugPrint('❌ Login falló');
-        
-        if (mounted) {
-          // El error ya se muestra automáticamente través del Consumer
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.errorMessage ?? 'Error de autenticación'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e, st) {
-      debugPrint('❌ Error inesperado en _login: $e');
-      debugPrint('Stack trace: $st');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error inesperado: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    final valid = verifyCredentials(username, password);
+    if (valid) {
+      _isAuthenticated = true;
+      _currentUsername = username;
+      _currentRole = _mapUserToRole(username);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } else {
+      _isAuthenticated = false;
+      _errorMessage = "Usuario o contraseña incorrectos";
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 
-  // Método de testing para verificar credenciales sin Firebase
-  Future<void> _testLogin() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  /// Login rápido para testing (sin validación estricta)
+  Future<bool> loginWithUsernameSimple(String username, String password) async {
+    _isLoading = true;
+    notifyListeners();
 
-    final username = usuarioController.text.trim();
-    final password = passwordController.text.trim();
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    debugPrint('=== TEST LOGIN ===');
-    
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Verificar credenciales localmente
-    final isValid = authProvider.verifyCredentials(username, password);
-    
-    debugPrint('Credenciales válidas: $isValid');
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isValid 
-              ? '✅ Credenciales correctas: $username/$password' 
-              : '❌ Credenciales incorrectas'
-          ),
-          backgroundColor: isValid ? Colors.green : Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    _isAuthenticated = true;
+    _currentUsername = username;
+    _currentRole = _mapUserToRole(username);
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
 
-    if (isValid) {
-      debugPrint('🔄 Intentando login simple...');
-      try {
-        final success = await authProvider.loginWithUsernameSimple(username, password);
-        if (success && mounted) {
-          Navigator.of(context).pushReplacementNamed('/empresa-selection');
-        }
-      } catch (e) {
-        debugPrint('❌ Error en login simple: $e');
-      }
+  /// Verificación local de credenciales de prueba
+  bool verifyCredentials(String username, String password) {
+    const users = {
+      "admin": "admin123",
+      "gerente": "gerente123",
+      "empleado": "empleado123",
+      "supervisor": "supervisor123",
+      "almacenero": "almacen123",
+    };
+
+    return users[username] == password;
+  }
+
+  void logout() {
+    _isAuthenticated = false;
+    _currentUsername = null;
+    _currentRole = UserRole.usuarioBasico;
+    notifyListeners();
+  }
+
+  /// Asigna rol según usuario
+  UserRole _mapUserToRole(String username) {
+    switch (username) {
+      case "admin":
+        return UserRole.admin;
+      case "gerente":
+        return UserRole.gerente;
+      case "empleado":
+        return UserRole.empleado;
+      case "supervisor":
+        return UserRole.supervisor;
+      case "almacenero":
+        return UserRole.almacenero;
+      default:
+        return UserRole.usuarioBasico;
     }
   }
 }
