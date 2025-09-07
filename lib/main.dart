@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         initialRoute: '/login',
-        routes: AppRoutes.getRoutes(),
+        routes: AppRoute.getRoutes),
         onGenerateRoute: (settings) {
           // Manejar rutas que necesitan argumentos especiales
           final String routeName = settings.name ?? '';
