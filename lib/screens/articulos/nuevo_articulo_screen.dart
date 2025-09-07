@@ -56,7 +56,7 @@ class _NuevoArticuloScreenState extends State<NuevoArticuloScreen> {
         precio: double.tryParse(_precioController.text) ?? 0.0,
         stock: int.tryParse(_stockController.text) ?? 0,
         stockMinimo: int.tryParse(_stockMinimoController.text) ?? 0,
-        ubicacion: _ubicacionController.text.trim(),
+        // Remover el parámetro ubicacion que no existe en el modelo
         activo: _activo,
         fechaCreacion: DateTime.now(),
         fechaActualizacion: DateTime.now(),

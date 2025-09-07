@@ -290,7 +290,7 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
-                      title: Text(articulo.descripcion),
+                      title: Text(articulo.descripcion ?? articulo.nombre),
                       subtitle: Text('Código: ${articulo.codigo} | Stock: ${articulo.stock}'),
                       trailing: isSelected
                           ? Row(
@@ -392,7 +392,7 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
               final cantidad = _cantidades[key] ?? 1;
               return Padding(
                 padding: const EdgeInsets.only(left: 16, top: 4),
-                child: Text('• ${articulo.descripcion}: $cantidad unidades'),
+                child: Text('• ${articulo.descripcion ?? articulo.nombre}: $cantidad unidades'),
               );
             }).toList(),
           ],

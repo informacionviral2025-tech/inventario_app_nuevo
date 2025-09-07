@@ -64,7 +64,8 @@ class ArticuloService {
       final queryLower = query.toLowerCase();
       return articulos.where((articulo) {
         return articulo.codigo.toLowerCase().contains(queryLower) ||
-               articulo.descripcion.toLowerCase().contains(queryLower) ||
+               (articulo.descripcion?.toLowerCase().contains(queryLower) ?? false) ||
+               (articulo.nombre.toLowerCase().contains(queryLower)) ||
                (articulo.categoria?.toLowerCase().contains(queryLower) ?? false);
       }).toList();
     } catch (e) {

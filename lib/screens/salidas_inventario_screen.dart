@@ -157,7 +157,8 @@ class _SalidasInventarioScreenState extends State<SalidasInventarioScreen> {
     final query = _searchController.text.toLowerCase();
     return _articulos.where((articulo) {
       return articulo.codigo.toLowerCase().contains(query) ||
-             articulo.descripcion.toLowerCase().contains(query);
+             (articulo.descripcion?.toLowerCase().contains(query) ?? false) ||
+             articulo.nombre.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -232,7 +233,7 @@ class _SalidasInventarioScreenState extends State<SalidasInventarioScreen> {
                 ),
               ),
               title: Text(
-                articulo.descripcion,
+                articulo.descripcion ?? articulo.nombre,
                 style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               subtitle: Column(
@@ -315,7 +316,7 @@ class _SalidasInventarioScreenState extends State<SalidasInventarioScreen> {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
-                '• ${articulo.descripcion}: $cantidad unidades',
+                '• ${articulo.descripcion ?? articulo.nombre}: $cantidad unidades',
                 style: const TextStyle(fontSize: 12),
               ),
             );

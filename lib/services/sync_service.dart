@@ -150,9 +150,20 @@ class SyncService {
             await _dbService.insertArticulo(firebaseArticle);
           } else {
             final localArticle = Articulo.fromMap(existing.first);
-            if (localArticle.fechaActualizacion.isBefore(firebaseArticle.fechaActualizacion)) {
+            
+            // CORRECCIÓN: Manejo de fechas nulas
+            final localFecha = localArticle.fechaActualizacion;
+            final firebaseFecha = firebaseArticle.fechaActualizacion;
+            
+            if (localFecha != null && firebaseFecha != null) {
+              if (localFecha.isBefore(firebaseFecha)) {
+                await _dbService.updateArticulo(firebaseArticle);
+              }
+            } else if (firebaseFecha != null) {
+              // Si solo Firebase tiene fecha, actualizar
               await _dbService.updateArticulo(firebaseArticle);
             }
+            // Si solo local tiene fecha o ambas son nulas, no hacer nada
           }
         }
       }

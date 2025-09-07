@@ -5,117 +5,102 @@ class Articulo {
   final String? id;
   final String? firebaseId;
   final String nombre;
-  final String codigo;
   final String? descripcion;
+  final String codigo;
   final String? categoria;
-  final double? precio;
   final int stock;
   final int? stockMinimo;
-  final String? ubicacion;
-  final bool? activo;
+  final double precio;
+  final String? codigoBarras;
+  final bool activo;
   final DateTime? fechaCreacion;
+  final DateTime? fechaModificacion;
   final DateTime? fechaActualizacion;
+  final bool? pendienteSincronizacion;
+  final bool? sincronizado;
 
   Articulo({
     this.id,
     this.firebaseId,
     required this.nombre,
-    required this.codigo,
     this.descripcion,
+    required this.codigo,
     this.categoria,
-    this.precio,
-    required this.stock,
+    this.stock = 0,
     this.stockMinimo,
-    this.ubicacion,
-    this.activo,
+    this.precio = 0.0,
+    this.codigoBarras,
+    this.activo = true,
     this.fechaCreacion,
+    this.fechaModificacion,
     this.fechaActualizacion,
+    this.pendienteSincronizacion,
+    this.sincronizado,
   });
 
-  // Factory constructor para crear desde Firestore
+  // Constructor desde Map (para Firestore)
+  factory Articulo.fromMap(Map<String, dynamic> map, [String? documentId]) {
+    return Articulo(
+      id: documentId ?? map['id'],
+      firebaseId: documentId,
+      nombre: map['nombre'] ?? map['descripcion'] ?? '',
+      descripcion: map['descripcion'] ?? map['nombre'],
+      codigo: map['codigo'] ?? map['codigoBarras'] ?? '',
+      categoria: map['categoria'],
+      stock: (map['stock'] ?? 0) is int ? map['stock'] : int.tryParse(map['stock'].toString()) ?? 0,
+      stockMinimo: map['stockMinimo'] != null ? int.tryParse(map['stockMinimo'].toString()) : null,
+      precio: (map['precio'] ?? 0.0) is double ? map['precio'] : double.tryParse(map['precio'].toString()) ?? 0.0,
+      codigoBarras: map['codigoBarras'] ?? map['codigo'],
+      activo: map['activo'] ?? true,
+      fechaCreacion: map['fechaCreacion'] is Timestamp 
+          ? (map['fechaCreacion'] as Timestamp).toDate()
+          : map['fechaCreacion'],
+      fechaModificacion: map['fechaModificacion'] is Timestamp
+          ? (map['fechaModificacion'] as Timestamp).toDate()
+          : map['fechaModificacion'],
+      fechaActualizacion: map['fechaActualizacion'] is Timestamp
+          ? (map['fechaActualizacion'] as Timestamp).toDate()
+          : map['fechaActualizacion'],
+      pendienteSincronizacion: map['pendienteSincronizacion'],
+      sincronizado: map['sincronizado'],
+    );
+  }
+
+  // Constructor desde Firestore
   factory Articulo.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    
-    return Articulo(
-      id: doc.id,
-      firebaseId: doc.id,
-      nombre: data['nombre'] ?? '',
-      codigo: data['codigo'] ?? '',
-      descripcion: data['descripcion'],
-      categoria: data['categoria'],
-      precio: (data['precio'] as num?)?.toDouble(),
-      stock: data['stock'] ?? 0,
-      stockMinimo: data['stockMinimo'],
-      ubicacion: data['ubicacion'],
-      activo: data['activo'] ?? true,
-      fechaCreacion: data['fechaCreacion'] != null 
-          ? (data['fechaCreacion'] as Timestamp).toDate()
-          : null,
-      fechaActualizacion: data['fechaActualizacion'] != null
-          ? (data['fechaActualizacion'] as Timestamp).toDate()
-          : null,
-    );
+    return Articulo.fromMap(data, doc.id);
   }
 
-  // Factory constructor para crear desde Map
-  factory Articulo.fromMap(Map<String, dynamic> map) {
-    return Articulo(
-      id: map['id'],
-      firebaseId: map['firebaseId'],
-      nombre: map['nombre'] ?? '',
-      codigo: map['codigo'] ?? '',
-      descripcion: map['descripcion'],
-      categoria: map['categoria'],
-      precio: (map['precio'] as num?)?.toDouble(),
-      stock: map['stock'] ?? 0,
-      stockMinimo: map['stockMinimo'],
-      ubicacion: map['ubicacion'],
-      activo: map['activo'] ?? true,
-      fechaCreacion: map['fechaCreacion'] != null 
-          ? DateTime.parse(map['fechaCreacion'])
-          : null,
-      fechaActualizacion: map['fechaActualizacion'] != null
-          ? DateTime.parse(map['fechaActualizacion'])
-          : null,
-    );
+  // Constructor fromFirebase (para compatibilidad)
+  factory Articulo.fromFirebase(String firebaseId, Map<String, dynamic> data) {
+    return Articulo.fromMap(data, firebaseId);
   }
 
-  // Convertir a Map para Firestore
-  Map<String, dynamic> toFirestore() {
-    return {
-      'nombre': nombre,
-      'codigo': codigo,
-      'descripcion': descripcion,
-      'categoria': categoria,
-      'precio': precio,
-      'stock': stock,
-      'stockMinimo': stockMinimo,
-      'ubicacion': ubicacion,
-      'activo': activo ?? true,
-      'fechaCreacion': fechaCreacion != null 
-          ? Timestamp.fromDate(fechaCreacion!)
-          : Timestamp.now(),
-      'fechaActualizacion': Timestamp.now(),
-    };
-  }
-
-  // Convertir a Map genérico
+  // Convertir a Map (para Firestore)
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'firebaseId': firebaseId,
+      if (id != null) 'id': id,
       'nombre': nombre,
+      'descripcion': descripcion ?? nombre,
       'codigo': codigo,
-      'descripcion': descripcion,
       'categoria': categoria,
-      'precio': precio,
       'stock': stock,
       'stockMinimo': stockMinimo,
-      'ubicacion': ubicacion,
+      'precio': precio,
+      'codigoBarras': codigoBarras ?? codigo,
       'activo': activo,
-      'fechaCreacion': fechaCreacion?.toIso8601String(),
-      'fechaActualizacion': fechaActualizacion?.toIso8601String(),
+      'fechaCreacion': fechaCreacion ?? FieldValue.serverTimestamp(),
+      'fechaModificacion': fechaModificacion ?? FieldValue.serverTimestamp(),
+      'fechaActualizacion': fechaActualizacion ?? FieldValue.serverTimestamp(),
+      'pendienteSincronizacion': pendienteSincronizacion ?? false,
+      'sincronizado': sincronizado ?? false,
     };
+  }
+
+  // toFirebase (para compatibilidad con sync_service)
+  Map<String, dynamic> toFirebase() {
+    return toMap();
   }
 
   // Método copyWith para crear copias con cambios
@@ -123,49 +108,51 @@ class Articulo {
     String? id,
     String? firebaseId,
     String? nombre,
-    String? codigo,
     String? descripcion,
+    String? codigo,
     String? categoria,
-    double? precio,
     int? stock,
     int? stockMinimo,
-    String? ubicacion,
+    double? precio,
+    String? codigoBarras,
     bool? activo,
     DateTime? fechaCreacion,
+    DateTime? fechaModificacion,
     DateTime? fechaActualizacion,
+    bool? pendienteSincronizacion,
+    bool? sincronizado,
   }) {
     return Articulo(
       id: id ?? this.id,
       firebaseId: firebaseId ?? this.firebaseId,
       nombre: nombre ?? this.nombre,
-      codigo: codigo ?? this.codigo,
       descripcion: descripcion ?? this.descripcion,
+      codigo: codigo ?? this.codigo,
       categoria: categoria ?? this.categoria,
-      precio: precio ?? this.precio,
       stock: stock ?? this.stock,
       stockMinimo: stockMinimo ?? this.stockMinimo,
-      ubicacion: ubicacion ?? this.ubicacion,
+      precio: precio ?? this.precio,
+      codigoBarras: codigoBarras ?? this.codigoBarras,
       activo: activo ?? this.activo,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
+      fechaModificacion: fechaModificacion ?? this.fechaModificacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
+      pendienteSincronizacion: pendienteSincronizacion ?? this.pendienteSincronizacion,
+      sincronizado: sincronizado ?? this.sincronizado,
     );
   }
 
   @override
   String toString() {
-    return 'Articulo{id: $id, nombre: $nombre, codigo: $codigo, stock: $stock}';
+    return 'Articulo(id: $id, nombre: $nombre, stock: $stock, precio: $precio)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    
-    return other is Articulo &&
-        other.id == id &&
-        other.nombre == nombre &&
-        other.codigo == codigo;
+    return other is Articulo && other.id == id;
   }
 
   @override
-  int get hashCode => id.hashCode ^ nombre.hashCode ^ codigo.hashCode;
+  int get hashCode => id.hashCode;
 }

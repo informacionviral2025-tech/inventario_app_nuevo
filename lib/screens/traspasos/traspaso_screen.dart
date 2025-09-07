@@ -4,12 +4,10 @@ import 'nuevo_traspaso_screen.dart';
 
 class TraspasoScreen extends StatefulWidget {
   final String empresaId;
-  final String? obraId; // Opcional para cuando se viene desde una obra específica
 
   const TraspasoScreen({
     super.key, 
     required this.empresaId,
-    this.obraId,
   });
 
   @override
@@ -171,14 +169,8 @@ class _TraspasoScreenState extends State<TraspasoScreen>
 
   // Lista de traspasos
   Widget _buildListaTraspasos() {
-    final entidadId = widget.obraId ?? widget.empresaId;
-    final tipoEntidad = widget.obraId != null ? 'obra' : 'empresa';
-
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _traspasoService.obtenerHistorialTraspasos(
-        entidadId: entidadId,
-        tipoEntidad: tipoEntidad,
-      ),
+    return StreamBuilder<List<dynamic>>(
+      stream: _traspasoService.obtenerTraspasosStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -233,64 +225,36 @@ class _TraspasoScreenState extends State<TraspasoScreen>
   }
 
   Widget _buildListaAlbaranes() {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _traspasoService.obtenerAlbaranes(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.receipt,
-                  size: 64,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No hay albaranes registrados',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Funcionalidad de albaranes\npróximamente disponible',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
             ),
-          );
-        }
-        final albaranes = snapshot.data!;
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: albaranes.length,
-          itemBuilder: (context, index) {
-            return _buildAlbaranCard(albaranes[index]);
-          },
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
-}
 
-// --- Tarjetas ---
-Widget _buildTraspasoCard(Map<String, dynamic> traspaso) {
-  return Card(
-    child: ListTile(
-      title: Text(traspaso['descripcion'] ?? 'Sin descripción'),
-      subtitle: Text('Cantidad: ${traspaso['cantidad'] ?? 0}'),
-      trailing: const Icon(Icons.swap_horiz),
-    ),
-  );
-}
-
-Widget _buildAlbaranCard(Map<String, dynamic> albaran) {
-  return Card(
-    child: ListTile(
-      title: Text(albaran['descripcion'] ?? 'Sin descripción'),
-      subtitle: Text('Proveedor: ${albaran['proveedor'] ?? 'N/A'}'),
-      trailing: const Icon(Icons.receipt),
-    ),
-  );
+  Widget _buildTraspasoCard(dynamic traspaso) {
+    return Card(
+      child: ListTile(
+        title: Text(traspaso.toString()),
+        subtitle: const Text('Información del traspaso'),
+        trailing: const Icon(Icons.swap_horiz),
+      ),
+    );
+  }
 }
