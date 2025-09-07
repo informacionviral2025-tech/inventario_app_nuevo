@@ -1,35 +1,21 @@
 // lib/providers/inventory_provider.dart
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/articulo.dart';
 import '../services/articulo_service.dart';
 
 class InventoryProvider extends ChangeNotifier {
-  final String empresaId;
-  final ArticuloService _articuloService;
-  
   List<Articulo> _articulos = [];
   bool _isLoading = false;
   String? _error;
+  ArticuloService? _articuloService;
 
-  InventoryProvider(this.empresaId) : _articuloService = ArticuloService(empresaId);
-
-  // Getters
   List<Articulo> get articulos => _articulos;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Getter para artículos con stock bajo
-  List<Articulo> get articulosStockBajo {
-    return _articulos.where((articulo) {
-      final stockMinimo = articulo.stockMinimo ?? 0;
-      return articulo.stock <= stockMinimo && stockMinimo > 0;
-    }
-
-  // Refrescar datos
-  Future<void> refresh() async {
-    await cargarArticulos();
-  }
-}).toList();
+  // Método para inicializar el servicio
+  void initializeService(String empresaId) {
+    _articuloService = ArticuloService(empresaId);
   }
 
   // Getter para artículos activos
@@ -37,20 +23,27 @@ class InventoryProvider extends ChangeNotifier {
     return _articulos.where((articulo) => articulo.activo == true).toList();
   }
 
-  // Getter para total de artículos
+  // Método para refrescar datos
+  Future<void> refresh() async {
+    if (_articuloService != null) {
+      await loadArticulos(_articuloService!.empresaId);
+    }
+  }
+
   int get totalArticulos => _articulos.length;
 
-  // Getter para total de stock
   int get totalStock => _articulos.fold(0, (sum, articulo) => sum + articulo.stock);
 
-  // Cargar artículos
-  Future<void> cargarArticulos() async {
+  Future<void> loadArticulos(String empresaId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _articulos = await _articuloService.getArticulos();
+      if (_articuloService == null) {
+        initializeService(empresaId);
+      }
+      _articulos = await _articuloService!.getArticulos();
       _error = null;
     } catch (e) {
       _error = 'Error al cargar artículos: $e';
@@ -61,96 +54,76 @@ class InventoryProvider extends ChangeNotifier {
     }
   }
 
-  // Agregar artículo
-  Future<void> agregarArticulo(Articulo articulo) async {
+  Future<void> addArticulo(Articulo articulo) async {
     try {
-      await _articuloService.addArticulo(articulo);
-      await cargarArticulos(); // Recargar la lista
+      await _articuloService!.addArticulo(articulo);
+      await refresh();
     } catch (e) {
       _error = 'Error al agregar artículo: $e';
       notifyListeners();
-      rethrow;
     }
   }
 
-  // Actualizar artículo
-  Future<void> actualizarArticulo(Articulo articulo) async {
+  Future<void> updateArticulo(Articulo articulo) async {
     try {
-      await _articuloService.updateArticulo(articulo);
-      await cargarArticulos(); // Recargar la lista
+      await _articuloService!.updateArticulo(articulo);
+      await refresh();
     } catch (e) {
       _error = 'Error al actualizar artículo: $e';
       notifyListeners();
-      rethrow;
     }
   }
 
-  // Eliminar artículo
-  Future<void> eliminarArticulo(String articuloId) async {
+  Future<void> deleteArticulo(String articuloId) async {
     try {
-      await _articuloService.deleteArticulo(articuloId);
-      await cargarArticulos(); // Recargar la lista
+      await _articuloService!.deleteArticulo(articuloId);
+      await refresh();
     } catch (e) {
       _error = 'Error al eliminar artículo: $e';
       notifyListeners();
-      rethrow;
     }
   }
 
-  // Buscar artículos
-  List<Articulo> buscarArticulos(String query) {
+  List<Articulo> searchArticulos(String query, String empresaId) {
     if (query.isEmpty) return _articulos;
     
-    final queryLower = query.toLowerCase();
+    final lowercaseQuery = query.toLowerCase();
     return _articulos.where((articulo) {
-      return articulo.codigo.toLowerCase().contains(queryLower) ||
-             articulo.descripcion.toLowerCase().contains(queryLower) ||
-             (articulo.categoria?.toLowerCase().contains(queryLower) ?? false);
+      return articulo.nombre.toLowerCase().contains(lowercaseQuery) ||
+             articulo.codigo.toLowerCase().contains(lowercaseQuery) ||
+             articulo.categoria.toLowerCase().contains(lowercaseQuery);
     }).toList();
   }
 
-  // Filtrar por categoría
-  List<Articulo> filtrarPorCategoria(String categoria) {
-    return _articulos.where((articulo) => 
-        articulo.categoria?.toLowerCase() == categoria.toLowerCase()).toList();
+  List<Articulo> getArticulosByCategoria(String categoria) {
+    return _articulos.where((articulo) =>
+        articulo.categoria.toLowerCase() == categoria.toLowerCase()).toList();
   }
 
-  // Obtener categorías únicas
-  List<String> get categorias {
+  List<Articulo> getArticulosConStockBajo({int limite = 10}) {
     return _articulos
-        .where((articulo) => articulo.categoria != null && articulo.categoria!.isNotEmpty)
-        .map((articulo) => articulo.categoria!)
-        .toSet()
+        .where((articulo) => articulo.stock <= limite)
         .toList()
-        ..sort();
+        ..sort((a, b) => a.stock.compareTo(b.stock));
   }
 
-  // Actualizar stock de un artículo
-  Future<void> actualizarStock(String articuloId, int nuevoStock) async {
+  Future<void> updateStock(String articuloId, int nuevoStock) async {
     try {
       final index = _articulos.indexWhere((a) => a.id == articuloId || a.firebaseId == articuloId);
       if (index != -1) {
         final articuloActualizado = _articulos[index].copyWith(
           stock: nuevoStock,
-          fechaModificacion: DateTime.now(),
         );
-        await actualizarArticulo(articuloActualizado);
+        await updateArticulo(articuloActualizado);
       }
     } catch (e) {
       _error = 'Error al actualizar stock: $e';
       notifyListeners();
-      rethrow;
     }
   }
 
-  // Limpiar error
-  void limpiarError() {
+  void clearError() {
     _error = null;
     notifyListeners();
-  }
-
-  // Refrescar datos
-  Future<void> refresh() async {
-    await cargarArticulos();
   }
 }

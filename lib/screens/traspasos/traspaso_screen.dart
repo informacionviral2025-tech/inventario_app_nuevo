@@ -24,7 +24,7 @@ class _TraspasoScreenState extends State<TraspasoScreen>
   @override
   void initState() {
     super.initState();
-    _traspasoService = TraspasoService();
+    _traspasoService = TraspasoService(widget.empresaId);
     _tabController = TabController(length: 2, vsync: this);
   }
 

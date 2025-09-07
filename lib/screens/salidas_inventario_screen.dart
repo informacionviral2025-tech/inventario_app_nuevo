@@ -309,7 +309,7 @@ class _SalidasInventarioScreenState extends State<SalidasInventarioScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          ...._articulosSeleccionados.map((articulo) {
+          ..._articulosSeleccionados.map((articulo) {
             final key = articulo.id ?? articulo.firebaseId ?? '';
             final cantidad = _cantidadesSalida[key] ?? 1;
             return Padding(

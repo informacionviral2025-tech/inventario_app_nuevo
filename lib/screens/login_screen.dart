@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       const String empresaId = 'empresa_test_001';
       
       if (mounted) {
-        AppRouter.goToHome(context, empresaId);
+        AppRoutes.goToHome(context, empresaId);
       }
     } catch (e) {
       if (mounted) {

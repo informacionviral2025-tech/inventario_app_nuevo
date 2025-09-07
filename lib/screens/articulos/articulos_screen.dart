@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../providers/inventory_provider.dart';
 import '../../models/articulo.dart';
+import '../../routes.dart';
 
 class ArticulosScreen extends StatefulWidget {
   final String empresaId;
 
-  const ArticulosScreen({
-    super.key,
-    required this.empresaId,
-  });
+  const ArticulosScreen({Key? key, required this.empresaId}) : super(key: key);
 
   @override
   State<ArticulosScreen> createState() => _ArticulosScreenState();
@@ -17,13 +16,17 @@ class ArticulosScreen extends StatefulWidget {
 class _ArticulosScreenState extends State<ArticulosScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  List<Articulo> _articulos = [];
-  bool _isLoading = true;
+  String _filtroCategoria = 'Todas';
+  bool _soloStockBajo = false;
 
   @override
   void initState() {
     super.initState();
-    _loadArticulos();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
+      inventoryProvider.initializeService(widget.empresaId);
+      inventoryProvider.loadArticulos(widget.empresaId);
+    });
   }
 
   @override
@@ -32,50 +35,37 @@ class _ArticulosScreenState extends State<ArticulosScreen> {
     super.dispose();
   }
 
-  Future<void> _loadArticulos() async {
-    setState(() {
-      _isLoading = true;
-    });
+  List<Articulo> _getArticulosFiltrados(List<Articulo> articulos) {
+    List<Articulo> filtrados = articulos;
 
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('empresas')
-          .doc(widget.empresaId)
-          .collection('articulos')
-          .orderBy('nombre')
-          .get();
-
-      setState(() {
-        _articulos = querySnapshot.docs.map((doc) {
-          final data = doc.data();
-          return Articulo.fromMap(data, doc.id);
-        }).toList();
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar artículos: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+    // Filtro por búsqueda
+    if (_searchQuery.isNotEmpty) {
+      filtrados = filtrados.where((articulo) {
+        return articulo.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               articulo.codigo.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               articulo.categoria.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
     }
+
+    // Filtro por categoría
+    if (_filtroCategoria != 'Todas') {
+      filtrados = filtrados.where((articulo) =>
+          articulo.categoria.toLowerCase() == _filtroCategoria.toLowerCase()).toList();
+    }
+
+    // Filtro por stock bajo
+    if (_soloStockBajo) {
+      filtrados = filtrados.where((articulo) =>
+          articulo.stock <= articulo.stockMinimo).toList();
+    }
+
+    return filtrados;
   }
 
-  List<Articulo> get _filteredArticulos {
-    if (_searchQuery.isEmpty) {
-      return _articulos;
-    }
-    return _articulos.where((articulo) {
-      return articulo.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          articulo.codigo.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          articulo.categoria.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+  List<String> _getCategorias(List<Articulo> articulos) {
+    final categorias = articulos.map((a) => a.categoria).toSet().toList();
+    categorias.sort();
+    return ['Todas', ...categorias];
   }
 
   @override
@@ -83,434 +73,270 @@ class _ArticulosScreenState extends State<ArticulosScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Artículos'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
+            onPressed: () {
+              AppRoutes.goToNuevoArticulo(context, widget.empresaId);
+            },
             icon: const Icon(Icons.add),
-            onPressed: () => _showArticuloDialog(),
+            tooltip: 'Nuevo artículo',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Buscar artículos...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : null,
+      body: Consumer<InventoryProvider>(
+        builder: (context, inventoryProvider, child) {
+          if (inventoryProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (inventoryProvider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red[300],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error: ${inventoryProvider.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      inventoryProvider.loadArticulos(widget.empresaId);
+                    },
+                    child: const Text('Reintentar'),
+                  ),
+                ],
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredArticulos.isEmpty
-                    ? const Center(
+            );
+          }
+
+          final articulos = inventoryProvider.articulos;
+          final articulosFiltrados = _getArticulosFiltrados(articulos);
+          final categorias = _getCategorias(articulos);
+
+          return Column(
+            children: [
+              // Filtros
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Barra de búsqueda
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar artículos...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                                icon: const Icon(Icons.clear),
+                              )
+                            : null,
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    // Filtros adicionales
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButton<String>(
+                            value: _filtroCategoria,
+                            isExpanded: true,
+                            items: categorias.map((categoria) {
+                              return DropdownMenuItem(
+                                value: categoria,
+                                child: Text(categoria),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _filtroCategoria = value ?? 'Todas';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        FilterChip(
+                          label: const Text('Stock bajo'),
+                          selected: _soloStockBajo,
+                          onSelected: (selected) {
+                            setState(() {
+                              _soloStockBajo = selected;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Lista de artículos
+              Expanded(
+                child: articulosFiltrados.isEmpty
+                    ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.inventory_2_outlined,
                               size: 64,
-                              color: Colors.grey,
+                              color: Colors.grey[400],
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             Text(
-                              'No hay artículos disponibles',
+                              articulos.isEmpty 
+                                  ? 'No hay artículos registrados'
+                                  : 'No se encontraron artículos',
                               style: TextStyle(
                                 fontSize: 18,
-                                color: Colors.grey,
+                                color: Colors.grey[600],
                               ),
                             ),
+                            if (articulos.isEmpty) ...[
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  AppRoutes.goToNuevoArticulo(context, widget.empresaId);
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Crear primer artículo'),
+                              ),
+                            ],
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _filteredArticulos.length,
-                        itemBuilder: (context, index) {
-                          final articulo = _filteredArticulos[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: _getStockColor(articulo.stock),
-                                child: Text(
-                                  articulo.stock.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                    : RefreshIndicator(
+                        onRefresh: () => inventoryProvider.refresh(),
+                        child: ListView.builder(
+                          itemCount: articulosFiltrados.length,
+                          itemBuilder: (context, index) {
+                            final articulo = articulosFiltrados[index];
+                            final stockBajo = articulo.stock <= articulo.stockMinimo;
+                            
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 4.0,
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: stockBajo ? Colors.red : Colors.blue,
+                                  child: Text(
+                                    articulo.nombre.isNotEmpty 
+                                        ? articulo.nombre[0].toUpperCase()
+                                        : 'A',
+                                    style: const TextStyle(color: Colors.white),
                                   ),
                                 ),
-                              ),
-                              title: Text(
-                                articulo.nombre,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Código: ${articulo.codigo}'),
-                                  Text('Categoría: ${articulo.categoria}'),
-                                  Text(
-                                    'Precio: €${articulo.precio.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.green,
-                                    ),
+                                title: Text(
+                                  articulo.nombre,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: articulo.activo ? null : Colors.grey,
                                   ),
-                                ],
-                              ),
-                              trailing: PopupMenuButton(
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Código: ${articulo.codigo}'),
+                                    Text('Categoría: ${articulo.categoria}'),
+                                    Row(
                                       children: [
-                                        Icon(Icons.edit),
-                                        SizedBox(width: 8),
-                                        Text('Editar'),
+                                        Text(
+                                          'Stock: ${articulo.stock}',
+                                          style: TextStyle(
+                                            color: stockBajo ? Colors.red : null,
+                                            fontWeight: stockBajo ? FontWeight.bold : null,
+                                          ),
+                                        ),
+                                        if (stockBajo) ...[
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.warning,
+                                            size: 16,
+                                            color: Colors.red,
+                                          ),
+                                        ],
                                       ],
                                     ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Eliminar', style: TextStyle(color: Colors.red)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _showArticuloDialog(articulo: articulo);
-                                      break;
-                                    case 'delete':
-                                      _confirmDelete(articulo);
-                                      break;
-                                  }
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (articulo.precio > 0)
+                                      Text(
+                                        '\$${articulo.precio.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    if (!articulo.activo)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Text(
+                                          'Inactivo',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  AppRoutes.goToEditarArticulo(
+                                    context,
+                                    widget.empresaId,
+                                    articulo.id,
+                                  );
                                 },
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getStockColor(int stock) {
-    if (stock == 0) return Colors.red;
-    if (stock < 10) return Colors.orange;
-    if (stock < 50) return Colors.yellow[700]!;
-    return Colors.green;
-  }
-
-  void _showArticuloDialog({Articulo? articulo}) {
-    showDialog(
-      context: context,
-      builder: (context) => ArticuloDialog(
-        empresaId: widget.empresaId,
-        articulo: articulo,
-        onSaved: () {
-          _loadArticulos();
-        },
-      ),
-    );
-  }
-
-  void _confirmDelete(Articulo articulo) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar eliminación'),
-        content: Text('¿Estás seguro de eliminar el artículo "${articulo.nombre}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _deleteArticulo(articulo);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deleteArticulo(Articulo articulo) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('empresas')
-          .doc(widget.empresaId)
-          .collection('articulos')
-          .doc(articulo.id)
-          .delete();
-
-      _loadArticulos();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Artículo eliminado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-}
-
-class ArticuloDialog extends StatefulWidget {
-  final String empresaId;
-  final Articulo? articulo;
-  final VoidCallback onSaved;
-
-  const ArticuloDialog({
-    super.key,
-    required this.empresaId,
-    this.articulo,
-    required this.onSaved,
-  });
-
-  @override
-  State<ArticuloDialog> createState() => _ArticuloDialogState();
-}
-
-class _ArticuloDialogState extends State<ArticuloDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nombreController = TextEditingController();
-  final _codigoController = TextEditingController();
-  final _categoriaController = TextEditingController();
-  final _precioController = TextEditingController();
-  final _stockController = TextEditingController();
-  final _descripcionController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.articulo != null) {
-      final articulo = widget.articulo!;
-      _nombreController.text = articulo.nombre;
-      _codigoController.text = articulo.codigo;
-      _categoriaController.text = articulo.categoria;
-      _precioController.text = articulo.precio.toString();
-      _stockController.text = articulo.stock.toString();
-      _descripcionController.text = articulo.descripcion ?? '';
-    }
-  }
-
-  @override
-  void dispose() {
-    _nombreController.dispose();
-    _codigoController.dispose();
-    _categoriaController.dispose();
-    _precioController.dispose();
-    _stockController.dispose();
-    _descripcionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveArticulo() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final articulo = Articulo(
-        id: widget.articulo?.id ?? '',
-        nombre: _nombreController.text.trim(),
-        codigo: _codigoController.text.trim(),
-        categoria: _categoriaController.text.trim(),
-        precio: double.parse(_precioController.text),
-        stock: int.parse(_stockController.text),
-        descripcion: _descripcionController.text.trim().isEmpty 
-            ? null 
-            : _descripcionController.text.trim(),
-        fechaCreacion: widget.articulo?.fechaCreacion ?? DateTime.now(),
-        fechaModificacion: DateTime.now(),
-      );
-
-      if (widget.articulo != null) {
-        // Actualizar
-        await FirebaseFirestore.instance
-            .collection('empresas')
-            .doc(widget.empresaId)
-            .collection('articulos')
-            .doc(widget.articulo!.id)
-            .update(articulo.toMap());
-      } else {
-        // Crear nuevo
-        await FirebaseFirestore.instance
-            .collection('empresas')
-            .doc(widget.empresaId)
-            .collection('articulos')
-            .add(articulo.toMap());
-      }
-
-      widget.onSaved();
-      
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.articulo != null 
-                ? 'Artículo actualizado exitosamente'
-                : 'Artículo creado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.articulo != null ? 'Editar Artículo' : 'Nuevo Artículo'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nombreController,
-                decoration: const InputDecoration(labelText: 'Nombre *'),
-                validator: (value) => value?.trim().isEmpty == true 
-                    ? 'El nombre es requerido' 
-                    : null,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _codigoController,
-                decoration: const InputDecoration(labelText: 'Código *'),
-                validator: (value) => value?.trim().isEmpty == true 
-                    ? 'El código es requerido' 
-                    : null,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _categoriaController,
-                decoration: const InputDecoration(labelText: 'Categoría *'),
-                validator: (value) => value?.trim().isEmpty == true 
-                    ? 'La categoría es requerida' 
-                    : null,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _precioController,
-                decoration: const InputDecoration(labelText: 'Precio *'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value?.trim().isEmpty == true) {
-                    return 'El precio es requerido';
-                  }
-                  if (double.tryParse(value!) == null) {
-                    return 'Precio inválido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _stockController,
-                decoration: const InputDecoration(labelText: 'Stock *'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value?.trim().isEmpty == true) {
-                    return 'El stock es requerido';
-                  }
-                  if (int.tryParse(value!) == null) {
-                    return 'Stock inválido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _descripcionController,
-                decoration: const InputDecoration(labelText: 'Descripción'),
-                maxLines: 3,
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _saveArticulo,
-          child: _isLoading 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(widget.articulo != null ? 'Actualizar' : 'Crear'),
-        ),
-      ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          AppRoutes.goToNuevoArticulo(context, widget.empresaId);
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }
