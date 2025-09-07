@@ -1,6 +1,6 @@
 // lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
-import '../utils/app_router.dart';
+import '../routes/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -38,7 +38,11 @@ class _LoginScreenState extends State<LoginScreen> {
       const String empresaId = 'empresa_test_001';
       
       if (mounted) {
-        AppRoutes.goToHome(context, empresaId);
+        Navigator.pushReplacementNamed(
+          context,
+          '/home',
+          arguments: {'empresaId': empresaId},
+      );
       }
     } catch (e) {
       if (mounted) {

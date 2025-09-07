@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../models/articulo.dart';
 import '../services/articulo_service.dart';
-import '../utils/app_router.dart';
+import '../routes/app_routes.dart';
 
 class SalidasInventarioScreen extends StatefulWidget {
   final String empresaId;

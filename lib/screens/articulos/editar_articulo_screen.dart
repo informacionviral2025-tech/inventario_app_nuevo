@@ -3,12 +3,12 @@ import '../../models/articulo.dart';
 import '../../services/database_service.dart';
 import '../../services/sync_helper.dart';
 
-class EditArticleScreen extends StatefulWidget {
+class EditarArticuloScreen extends StatefulWidget {
   final Articulo articulo;
   final String empresaId;
   final String empresaNombre;
 
-  const EditArticleScreen({
+  const EditarArticuloScreen({
     super.key,
     required this.articulo,
     required this.empresaId,
@@ -16,10 +16,10 @@ class EditArticleScreen extends StatefulWidget {
   });
 
   @override
-  State<EditArticleScreen> createState() => _EditArticleScreenState();
+  State<EditarArticuloScreen> createState() => _EditarArticuloScreenState();
 }
 
-class _EditArticleScreenState extends State<EditArticleScreen> {
+class _EditarArticuloScreenState extends State<EditarArticuloScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _descripcionController;

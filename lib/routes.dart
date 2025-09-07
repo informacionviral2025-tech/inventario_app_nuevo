@@ -6,8 +6,8 @@ import 'screens/articulos/articulos_screen.dart';
 import 'screens/entradas/entradas_screen.dart';
 import 'screens/salidas_inventario_screen.dart';
 import 'screens/traspasos/traspaso_screen.dart';
-import 'screens/inventario/inventario_screen.dart';
-import 'screens/reportes/reportes_screen.dart';
+import 'screens/entradas/entradas_inventario_screen.dart';
+import 'screens/reportes_screen.dart';
 import 'screens/articulos/nuevo_articulo_screen.dart';
 import 'screens/articulos/editar_articulo_screen.dart';
 

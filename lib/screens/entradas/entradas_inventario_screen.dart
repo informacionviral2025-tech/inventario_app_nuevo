@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/articulo.dart';
+import '../../models/articulo.dart';
 
 class EntradaInventarioScreen extends StatefulWidget {
   final String empresaId;
