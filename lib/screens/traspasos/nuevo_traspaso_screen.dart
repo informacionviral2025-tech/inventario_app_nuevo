@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../models/traspaso.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/articulo.dart';
+import '../../models/traspaso.dart';
+import '../../services/articulo_service.dart';
+import '../../services/traspaso_service.dart';
 
 class NuevoTraspasoScreen extends StatefulWidget {
-  final String empresaId;
-
-  const NuevoTraspasoScreen({
-    super.key,
-    required this.empresaId,
-  });
+  const NuevoTraspasoScreen({super.key});
 
   @override
   State<NuevoTraspasoScreen> createState() => _NuevoTraspasoScreenState();
@@ -17,64 +16,43 @@ class NuevoTraspasoScreen extends StatefulWidget {
 
 class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _observacionesController = TextEditingController();
+  final ArticuloService _articuloService = ArticuloService();
+  final TraspasoService _traspasoService = TraspasoService();
   
+  String _tipoOrigen = 'almacen';
   String _almacenOrigen = '';
+  String _obraOrigen = '';
+  String _tipoDestino = 'almacen';
   String _almacenDestino = '';
-  List<ItemTraspaso> _items = [];
-  List<String> _almacenes = [];
+  String _obraDestino = '';
+  String _observaciones = '';
+  
+  List<String> _almacenes = ['Almacén Central', 'Almacén Norte', 'Almacén Sur'];
+  List<String> _obras = ['Obra 1', 'Obra 2', 'Obra 3'];
   List<Articulo> _articulos = [];
+  List<Articulo> _articulosSeleccionados = [];
+  Map<String, int> _cantidades = {};
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadArticulos();
   }
 
-  @override
-  void dispose() {
-    _observacionesController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadData() async {
+  Future<void> _loadArticulos() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Cargar almacenes
-      final almacenesSnapshot = await FirebaseFirestore.instance
-          .collection('empresas')
-          .doc(widget.empresaId)
-          .collection('almacenes')
-          .get();
-
-      // Cargar artículos
-      final articulosSnapshot = await FirebaseFirestore.instance
-          .collection('empresas')
-          .doc(widget.empresaId)
-          .collection('articulos')
-          .get();
-
-      setState(() {
-        _almacenes = almacenesSnapshot.docs
-            .map((doc) => doc.data()['nombre'] as String)
-            .toList();
-        _articulos = articulosSnapshot.docs
-            .map((doc) => Articulo.fromMap(doc.data(), doc.id))
-            .toList();
-      });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final empresaId = authProvider.currentUser?.empresaId ?? '';
+      _articulos = await _articuloService.getArticulos(empresaId);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar datos: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar artículos: $e')),
+      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -82,34 +60,33 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
     }
   }
 
-  void _addItem() {
-    showDialog(
-      context: context,
-      builder: (context) => _ItemDialog(
-        articulos: _articulos,
-        onItemAdded: (item) {
-          setState(() {
-            _items.add(item);
-          });
-        },
-      ),
-    );
+  void _agregarArticulo(Articulo articulo) {
+    if (!_articulosSeleccionados.contains(articulo)) {
+      setState(() {
+        _articulosSeleccionados.add(articulo);
+        _cantidades[articulo.firebaseId ?? articulo.codigo] = 1;
+      });
+    }
   }
 
-  void _removeItem(int index) {
+  void _removerArticulo(Articulo articulo) {
     setState(() {
-      _items.removeAt(index);
+      _articulosSeleccionados.remove(articulo);
+      _cantidades.remove(articulo.firebaseId ?? articulo.codigo);
     });
   }
 
-  Future<void> _saveTraspaso() async {
+  void _actualizarCantidad(Articulo articulo, int cantidad) {
+    setState(() {
+      _cantidades[articulo.firebaseId ?? articulo.codigo] = cantidad;
+    });
+  }
+
+  Future<void> _guardarTraspaso() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_items.isEmpty) {
+    if (_articulosSeleccionados.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debe agregar al menos un artículo'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('Debe seleccionar al menos un artículo')),
       );
       return;
     }
@@ -119,40 +96,45 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
     });
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final empresaId = authProvider.currentUser?.empresaId ?? '';
+      final usuario = authProvider.currentUser?.displayName ?? '';
+
+      // Determinar origen y destino
+      String origenId = _tipoOrigen == 'almacen' ? _almacenOrigen : _obraOrigen;
+      String destinoId = _tipoDestino == 'almacen' ? _almacenDestino : _obraDestino;
+
+      // Crear mapa de artículos con cantidades
+      Map<String, int> articulosMap = {};
+      for (final articulo in _articulosSeleccionados) {
+        final id = articulo.firebaseId ?? articulo.codigo;
+        articulosMap[id] = _cantidades[id] ?? 1;
+      }
+
       final traspaso = Traspaso(
-        id: '',
-        numeroTraspaso: _generateTraspasoNumber(),
-        almacenOrigen: _almacenOrigen,
-        almacenDestino: _almacenDestino,
-        items: _items,
-        estado: EstadoTraspaso.pendiente,
-        observaciones: _observacionesController.text.trim(),
-        fechaCreacion: DateTime.now(),
-        creadoPor: 'usuario_actual', // Aquí deberías usar el ID del usuario actual
+        empresaId: empresaId,
+        tipoOrigen: _tipoOrigen,
+        origenId: origenId,
+        tipoDestino: _tipoDestino,
+        destinoId: destinoId,
+        articulos: articulosMap,
+        usuario: usuario,
+        fecha: DateTime.now(),
+        observaciones: _observaciones.isNotEmpty ? _observaciones : null,
       );
 
-      await FirebaseFirestore.instance
-          .collection('empresas')
-          .doc(widget.empresaId)
-          .collection('traspasos')
-          .add(traspaso.toMap());
+      await _traspasoService.crearTraspaso(traspaso);
 
       if (mounted) {
-        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Traspaso creado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Traspaso creado exitosamente')),
         );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al crear traspaso: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error al crear traspaso: $e')),
         );
       }
     } finally {
@@ -164,128 +146,267 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
     }
   }
 
-  String _generateTraspasoNumber() {
-    final now = DateTime.now();
-    return 'TRP-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(8)}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nuevo Traspaso'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveTraspaso,
-          ),
-        ],
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            DropdownButtonFormField<String>(
-              value: _almacenDestino.isEmpty ? null : _almacenDestino,
-              decoration: const InputDecoration(
-                labelText: 'Almacén Destino *',
-                border: OutlineInputBorder(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildOrigenSection(),
+                    const SizedBox(height: 16),
+                    _buildDestinoSection(),
+                    const SizedBox(height: 24),
+                    _buildArticulosSection(),
+                    const SizedBox(height: 16),
+                    _buildObservacionesSection(),
+                    const SizedBox(height: 16),
+                    _buildResumenSection(),
+                    const SizedBox(height: 24),
+                    _buildBotonesAccion(),
+                  ],
+                ),
               ),
-              items: _almacenes.where((almacen) => almacen != _almacenOrigen).map((almacen) {
-                return DropdownMenuItem(
-                  value: almacen,
-                  child: Text(almacen),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _almacenDestino = value ?? '';
-                });
-              },
-              validator: (value) => value?.isEmpty == true 
-                  ? 'Seleccione el almacén destino' 
-                  : null,
+            ),
+    );
+  }
+
+  Widget _buildOrigenSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Origen',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _observacionesController,
+            DropdownButtonFormField<String>(
+              value: _tipoOrigen,
               decoration: const InputDecoration(
-                labelText: 'Observaciones',
+                labelText: 'Tipo de Origen',
                 border: OutlineInputBorder(),
               ),
-              maxLines: 3,
+              items: const [
+                DropdownMenuItem(value: 'almacen', child: Text('Almacén')),
+                DropdownMenuItem(value: 'obra', child: Text('Obra')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _tipoOrigen = value!;
+                  _almacenOrigen = '';
+                  _obraOrigen = '';
+                });
+              },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            if (_tipoOrigen == 'almacen') ...[
+              DropdownButtonFormField<String>(
+                value: _almacenOrigen.isEmpty ? null : _almacenOrigen,
+                decoration: const InputDecoration(
+                  labelText: 'Almacén de Origen',
+                  border: OutlineInputBorder(),
+                ),
+                items: _almacenes.map((almacen) {
+                  return DropdownMenuItem(
+                    value: almacen,
+                    child: Text(almacen),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _almacenOrigen = value ?? '';
+                  });
+                },
+                validator: (value) => value?.isEmpty == true
+                    ? 'Seleccione un almacén de origen'
+                    : null,
+              ),
+            ] else ...[
+              DropdownButtonFormField<String>(
+                value: _obraOrigen.isEmpty ? null : _obraOrigen,
+                decoration: const InputDecoration(
+                  labelText: 'Obra de Origen',
+                  border: OutlineInputBorder(),
+                ),
+                items: _obras.map((obra) {
+                  return DropdownMenuItem(
+                    value: obra,
+                    child: Text(obra),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _obraOrigen = value ?? '';
+                  });
+                },
+                validator: (value) => value?.isEmpty == true
+                    ? 'Seleccione una obra de origen'
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDestinoSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Destino',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _tipoDestino,
+              decoration: const InputDecoration(
+                labelText: 'Tipo de Destino',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'almacen', child: Text('Almacén')),
+                DropdownMenuItem(value: 'obra', child: Text('Obra')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _tipoDestino = value!;
+                  _almacenDestino = '';
+                  _obraDestino = '';
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            if (_tipoDestino == 'almacen') ...[
+              DropdownButtonFormField<String>(
+                value: _almacenDestino.isEmpty ? null : _almacenDestino,
+                decoration: const InputDecoration(
+                  labelText: 'Almacén de Destino',
+                  border: OutlineInputBorder(),
+                ),
+                items: _almacenes.map((almacen) {
+                  return DropdownMenuItem(
+                    value: almacen,
+                    child: Text(almacen),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _almacenDestino = value ?? '';
+                  });
+                },
+                validator: (value) => value?.isEmpty == true
+                    ? 'Seleccione un almacén de destino'
+                    : null,
+              ),
+            ] else ...[
+              DropdownButtonFormField<String>(
+                value: _obraDestino.isEmpty ? null : _obraDestino,
+                decoration: const InputDecoration(
+                  labelText: 'Obra de Destino',
+                  border: OutlineInputBorder(),
+                ),
+                items: _obras.map((obra) {
+                  return DropdownMenuItem(
+                    value: obra,
+                    child: Text(obra),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _obraDestino = value ?? '';
+                  });
+                },
+                validator: (value) => value?.isEmpty == true
+                    ? 'Seleccione una obra de destino'
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArticulosSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Artículos (${_items.length})',
-                  style: Theme.of(context).textTheme.titleLarge,
+                const Text(
+                  'Artículos',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _addItem,
+                  onPressed: _mostrarDialogoSeleccionArticulos,
                   icon: const Icon(Icons.add),
                   label: const Text('Agregar'),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (_items.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 48,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No hay artículos agregados',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
+            if (_articulosSeleccionados.isEmpty)
+              const Center(
+                child: Text(
+                  'No hay artículos seleccionados',
+                  style: TextStyle(color: Colors.grey),
                 ),
               )
             else
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _items.length,
+                itemCount: _articulosSeleccionados.length,
                 itemBuilder: (context, index) {
-                  final item = _items[index];
+                  final articulo = _articulosSeleccionados[index];
+                  final id = articulo.firebaseId ?? articulo.codigo;
+                  final cantidad = _cantidades[id] ?? 1;
+
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      title: Text(item.nombreArticulo),
-                      subtitle: Text('Código: ${item.codigoArticulo}'),
+                      title: Text(articulo.descripcion),
+                      subtitle: Text('Código: ${articulo.codigo}'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Cantidad: ${item.cantidad}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          IconButton(
+                            onPressed: cantidad > 1
+                                ? () => _actualizarCantidad(articulo, cantidad - 1)
+                                : null,
+                            icon: const Icon(Icons.remove),
+                          ),
+                          Text('$cantidad'),
+                          IconButton(
+                            onPressed: () => _actualizarCantidad(articulo, cantidad + 1),
+                            icon: const Icon(Icons.add),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
+                            onPressed: () => _removerArticulo(articulo),
                             icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _removeItem(index),
                           ),
                         ],
                       ),
@@ -298,152 +419,113 @@ class _NuevoTraspasoScreenState extends State<NuevoTraspasoScreen> {
       ),
     );
   }
-}
 
-class _ItemDialog extends StatefulWidget {
-  final List<Articulo> articulos;
-  final Function(ItemTraspaso) onItemAdded;
-
-  const _ItemDialog({
-    required this.articulos,
-    required this.onItemAdded,
-  });
-
-  @override
-  State<_ItemDialog> createState() => _ItemDialogState();
-}
-
-class _ItemDialogState extends State<_ItemDialog> {
-  final _cantidadController = TextEditingController();
-  Articulo? _selectedArticulo;
-
-  @override
-  void dispose() {
-    _cantidadController.dispose();
-    super.dispose();
-  }
-
-  void _addItem() {
-    if (_selectedArticulo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Seleccione un artículo'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final cantidad = int.tryParse(_cantidadController.text);
-    if (cantidad == null || cantidad <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingrese una cantidad válida'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    if (cantidad > _selectedArticulo!.stock) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Stock insuficiente. Stock actual: ${_selectedArticulo!.stock}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final item = ItemTraspaso(
-      articuloId: _selectedArticulo!.id,
-      nombreArticulo: _selectedArticulo!.nombre,
-      codigoArticulo: _selectedArticulo!.codigo,
-      cantidad: cantidad,
-    );
-
-    widget.onItemAdded(item);
-    Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Agregar Artículo'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<Articulo>(
-            value: _selectedArticulo,
-            decoration: const InputDecoration(
-              labelText: 'Artículo *',
-              border: OutlineInputBorder(),
-            ),
-            items: widget.articulos.map((articulo) {
-              return DropdownMenuItem(
-                value: articulo,
-                child: Text('${articulo.nombre} (${articulo.codigo})'),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedArticulo = value;
-              });
-            },
-          ),
-          if (_selectedArticulo != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Stock disponible: ${_selectedArticulo!.stock}',
-              style: TextStyle(
-                color: _selectedArticulo!.stock > 0 ? Colors.green : Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _cantidadController,
-            decoration: const InputDecoration(
-              labelText: 'Cantidad *',
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.number,
-          ),
-        ],
+  Widget _buildObservacionesSection() {
+    return TextFormField(
+      decoration: const InputDecoration(
+        labelText: 'Observaciones (opcional)',
+        border: OutlineInputBorder(),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+      maxLines: 3,
+      onChanged: (value) => _observaciones = value,
+    );
+  }
+
+  Widget _buildResumenSection() {
+    final totalArticulos = _cantidades.values.fold<int>(0, (sum, cantidad) => sum + cantidad);
+    
+    return Card(
+      color: Colors.blue.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Resumen del Traspaso',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('Total de artículos: $totalArticulos'),
+            const SizedBox(height: 8),
+            Text('Tipos de artículos: ${_articulosSeleccionados.length}'),
+          ],
         ),
-        ElevatedButton(
-          onPressed: _addItem,
-          child: const Text('Agregar'),
+      ),
+    );
+  }
+
+  Widget _buildBotonesAccion() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _guardarTraspaso,
+            child: const Text('Crear Traspaso'),
+          ),
         ),
       ],
     );
   }
-}FormField<String>(
-              value: _almacenOrigen.isEmpty ? null : _almacenOrigen,
-              decoration: const InputDecoration(
-                labelText: 'Almacén Origen *',
-                border: OutlineInputBorder(),
+
+  void _mostrarDialogoSeleccionArticulos() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Seleccionar Artículos',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              items: _almacenes.map((almacen) {
-                return DropdownMenuItem(
-                  value: almacen,
-                  child: Text(almacen),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _almacenOrigen = value ?? '';
-                });
-              },
-              validator: (value) => value?.isEmpty == true 
-                  ? 'Seleccione el almacén origen' 
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButton
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _articulos.length,
+                  itemBuilder: (context, index) {
+                    final articulo = _articulos[index];
+                    final yaSeleccionado = _articulosSeleccionados.contains(articulo);
+
+                    return Card(
+                      child: ListTile(
+                        title: Text(articulo.descripcion),
+                        subtitle: Text(
+                          'Código: ${articulo.codigo}\nStock: ${articulo.stock}',
+                        ),
+                        trailing: yaSeleccionado
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : const Icon(Icons.add),
+                        onTap: yaSeleccionado
+                            ? null
+                            : () {
+                                _agregarArticulo(articulo);
+                                Navigator.pop(context);
+                              },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

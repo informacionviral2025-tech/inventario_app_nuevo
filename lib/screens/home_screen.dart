@@ -1,14 +1,8 @@
 // lib/screens/home_screen.dart - VERSIÓN CORREGIDA
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // AÑADIDO para HapticFeedback
-
-// Importa tus pantallas/tabs principales
-import 'tabs/inventario_tab.dart';
-import 'tabs/clientes_tab.dart';
-import 'tabs/obras_tab.dart';
-import 'tabs/traspasos_tab.dart';
-import 'tabs/proveedores_tab.dart';
-import 'tabs/configuracion_tab.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/inventory_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final String empresaId;
@@ -24,377 +18,411 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  int _currentIndex = 0;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  late final List<Widget> _tabs;
-
+class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    
-    // Configurar animaciones
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Inicializar tabs
-    _tabs = [
-      InventarioTab(
-        empresaId: widget.empresaId,
-        empresaNombre: widget.empresaNombre,
-      ),
-      ClientesTab(
-        empresaId: widget.empresaId,
-        empresaNombre: widget.empresaNombre,
-      ),
-      ObrasTab(empresaId: widget.empresaId),
-      TraspasosTab(empresaId: widget.empresaId),
-      ProveedoresTab(
-        empresaId: widget.empresaId,
-        empresaNombre: widget.empresaNombre,
-      ),
-      ConfiguracionTab(empresaId: widget.empresaId),
-    ];
-
-    // Iniciar animación
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _onTabTapped(int index) {
-    if (index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
-      
-      // Vibración para feedback
-      HapticFeedback.selectionClick();
-    }
+    // Cargar los artículos al inicializar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<InventoryProvider>(context, listen: false)
+          .loadArticulos(widget.empresaId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final inventoryProvider = Provider.of<InventoryProvider>(context);
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => _mostrarDialogoCambiarEmpresa(),
-          tooltip: 'Cambiar empresa',
+        title: Text('Inventario - ${widget.empresaNombre}'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await authProvider.signOut();
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await inventoryProvider.loadArticulos(widget.empresaId);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeCard(authProvider),
+              const SizedBox(height: 20),
+              _buildStatsCards(inventoryProvider),
+              const SizedBox(height: 20),
+              _buildQuickActions(),
+              const SizedBox(height: 20),
+              _buildRecentActivity(),
+            ],
+          ),
         ),
-        title: Row(
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildWelcomeCard(AuthProvider authProvider) {
+    return Card(
+      elevation: 4,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade400, Colors.blue.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+            Text(
+              'Bienvenido,',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
               ),
-              child: const Icon(Icons.business, size: 20),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.empresaNombre,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'ID: ${widget.empresaId}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
-                ],
+            Text(
+              authProvider.currentUser?.displayName ?? 'Usuario',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Empresa: ${widget.empresaNombre}',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
               ),
             ),
           ],
         ),
-        centerTitle: false,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              _showNotificationDialog(context);
-            },
+      ),
+    );
+  }
+
+  Widget _buildStatsCards(InventoryProvider inventoryProvider) {
+    if (inventoryProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            'Total Artículos',
+            '${inventoryProvider.articulos.length}',
+            Icons.inventory,
+            Colors.green,
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              switch (value) {
-                case 'sync':
-                  _syncData();
-                  break;
-                case 'change_company':
-                  _mostrarDialogoCambiarEmpresa();
-                  break;
-                case 'logout':
-                  _logout();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'sync',
-                child: Row(
-                  children: [
-                    Icon(Icons.sync, size: 20),
-                    SizedBox(width: 8),
-                    Text('Sincronizar'),
-                  ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            'Stock Total',
+            '${inventoryProvider.totalStock}',
+            Icons.warehouse,
+            Colors.blue,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            'Stock Bajo',
+            '${inventoryProvider.articulosStockBajo.length}',
+            Icons.warning,
+            Colors.orange,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: color, size: 24),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
               ),
-              const PopupMenuItem(
-                value: 'change_company',
-                child: Row(
-                  children: [
-                    Icon(Icons.business, size: 20),
-                    SizedBox(width: 8),
-                    Text('Cambiar Empresa'),
-                  ],
-                ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Acciones Rápidas',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          children: [
+            _buildActionCard(
+              'Entradas',
+              Icons.add_circle,
+              Colors.green,
+              () => Navigator.pushNamed(
+                context,
+                '/entradas',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                  'empresaNombre': widget.empresaNombre,
+                },
               ),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 20, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
-                  ],
+            ),
+            _buildActionCard(
+              'Salidas',
+              Icons.remove_circle,
+              Colors.red,
+              () => Navigator.pushNamed(
+                context,
+                '/salidas',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                  'empresaNombre': widget.empresaNombre,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Traspasos',
+              Icons.swap_horiz,
+              Colors.blue,
+              () => Navigator.pushNamed(context, '/traspasos'),
+            ),
+            _buildActionCard(
+              'Inventario',
+              Icons.inventory_2,
+              Colors.purple,
+              () => Navigator.pushNamed(context, '/inventario'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
-        ],
-      ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: IndexedStack(
-          index: _currentIndex,
-          children: _tabs,
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.blue.shade700,
-          unselectedItemColor: Colors.grey.shade600,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w400,
-            fontSize: 11,
-          ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              activeIcon: Icon(Icons.inventory_2),
-              label: "Inventario",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outlined),
-              activeIcon: Icon(Icons.people),
-              label: "Clientes",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.work_outline),
-              activeIcon: Icon(Icons.work),
-              label: "Obras",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.compare_arrows_outlined),
-              activeIcon: Icon(Icons.compare_arrows),
-              label: "Traspasos",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.business_outlined),
-              activeIcon: Icon(Icons.business),
-              label: "Proveedores",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: "Configuración",
-            ),
-          ],
         ),
       ),
     );
   }
 
-  void _mostrarDialogoCambiarEmpresa() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.business, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Cambiar Empresa'),
-          ],
-        ),
-        content: Text(
-          '¿Deseas volver al menú de selección de empresas?\n\n'
-          'Empresa actual: ${widget.empresaNombre}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+  Widget _buildRecentActivity() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Actividad Reciente',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              foregroundColor: Colors.white,
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildActivityItem(
+                  'Entrada de mercancía',
+                  'Se registraron 25 artículos',
+                  Icons.add_circle,
+                  Colors.green,
+                  'Hace 2 horas',
+                ),
+                const Divider(),
+                _buildActivityItem(
+                  'Traspaso completado',
+                  'Traspaso T-001 completado',
+                  Icons.swap_horiz,
+                  Colors.blue,
+                  'Hace 4 horas',
+                ),
+                const Divider(),
+                _buildActivityItem(
+                  'Stock bajo detectado',
+                  '3 artículos con stock bajo',
+                  Icons.warning,
+                  Colors.orange,
+                  'Hace 1 día',
+                ),
+              ],
             ),
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, '/empresa-selection');
-            },
-            child: const Text('Cambiar Empresa'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityItem(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    String time,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: color.withOpacity(0.1),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            time,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showNotificationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.notifications, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Notificaciones'),
-          ],
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.blue,
+      unselectedItemColor: Colors.grey,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Inicio',
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.info, color: Colors.green),
-              title: Text('Stock actualizado'),
-              subtitle: Text('Hace 2 horas'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.warning, color: Colors.orange),
-              title: Text('Stock bajo en 3 artículos'),
-              subtitle: Text('Hace 1 día'),
-            ),
-          ],
+        BottomNavigationBarItem(
+          icon: Icon(Icons.inventory),
+          label: 'Inventario',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _syncData() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('Sincronizando datos...'),
-          ],
+        BottomNavigationBarItem(
+          icon: Icon(Icons.swap_horiz),
+          label: 'Traspasos',
         ),
-      ),
-    );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('✅ Datos sincronizados correctamente'),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    });
-  }
-
-  void _logout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, '/empresa-selection');
-            },
-            child: const Text('Cerrar Sesión'),
-          ),
-        ],
-      ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Ajustes',
+        ),
+      ],
+      onTap: (index) {
+        switch (index) {
+          case 0:
+            // Ya estamos en inicio
+            break;
+          case 1:
+            Navigator.pushNamed(context, '/inventario');
+            break;
+          case 2:
+            Navigator.pushNamed(context, '/traspasos');
+            break;
+          case 3:
+            Navigator.pushNamed(context, '/ajustes');
+            break;
+        }
+      },
     );
   }
 }

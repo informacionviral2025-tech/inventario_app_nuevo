@@ -3,107 +3,139 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/articulo.dart';
 
 class ArticuloService {
-  final String empresaId;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String empresaId;
 
+  // Constructor que requiere empresaId
   ArticuloService(this.empresaId);
 
-  CollectionReference get _collection =>
-      _firestore.collection('empresas').doc(empresaId).collection('articulos');
-
-  Stream<List<Articulo>> getArticulos() {
-    return _collection.snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Articulo.fromFirestore(doc))
-          .toList();
-    });
-  }
-
-  Stream<List<Articulo>> getArticulosActivos() {
-    return _collection.where('activo', isEqualTo: true).snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Articulo.fromFirestore(doc))
-          .toList();
-    });
-  }
-
-  Future<Articulo?> obtenerArticulo(String id) async {
+  // Obtener todos los artículos de la empresa
+  Future<List<Articulo>> getArticulos() async {
     try {
-      final doc = await _collection.doc(id).get();
-      if (doc.exists) {
-        return Articulo.fromFirestore(doc);
+      final querySnapshot = await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return Articulo.fromFirestore(data);
+      }).toList();
+    } catch (e) {
+      print('Error al obtener artículos: $e');
+      return [];
+    }
+  }
+
+  // Agregar un nuevo artículo
+  Future<bool> addArticulo(Articulo articulo) async {
+    try {
+      await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .add(articulo.toFirestore());
+      return true;
+    } catch (e) {
+      print('Error al agregar artículo: $e');
+      return false;
+    }
+  }
+
+  // Actualizar un artículo existente
+  Future<bool> updateArticulo(Articulo articulo) async {
+    try {
+      if (articulo.id == null) return false;
+      
+      await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .doc(articulo.id)
+          .update(articulo.toFirestore());
+      return true;
+    } catch (e) {
+      print('Error al actualizar artículo: $e');
+      return false;
+    }
+  }
+
+  // Eliminar un artículo
+  Future<bool> deleteArticulo(String articuloId) async {
+    try {
+      await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .doc(articuloId)
+          .delete();
+      return true;
+    } catch (e) {
+      print('Error al eliminar artículo: $e');
+      return false;
+    }
+  }
+
+  // Buscar artículos por nombre o código
+  Future<List<Articulo>> searchArticulos(String query) async {
+    try {
+      // Buscar por nombre
+      final queryByName = await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .where('nombre', isGreaterThanOrEqualTo: query)
+          .where('nombre', isLessThanOrEqualTo: '$query\uf8ff')
+          .get();
+
+      // Buscar por código
+      final queryByCode = await _firestore
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('articulos')
+          .where('codigoBarras', isEqualTo: query)
+          .get();
+
+      final Set<String> processedIds = {};
+      final List<Articulo> results = [];
+
+      // Procesar resultados por nombre
+      for (var doc in queryByName.docs) {
+        if (!processedIds.contains(doc.id)) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          results.add(Articulo.fromFirestore(data));
+          processedIds.add(doc.id);
+        }
       }
-      return null;
+
+      // Procesar resultados por código
+      for (var doc in queryByCode.docs) {
+        if (!processedIds.contains(doc.id)) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          results.add(Articulo.fromFirestore(data));
+          processedIds.add(doc.id);
+        }
+      }
+
+      return results;
     } catch (e) {
-      print('Error obteniendo artículo: $e');
-      return null;
+      print('Error al buscar artículos: $e');
+      return [];
     }
   }
 
-  Future<String> agregarArticulo(Articulo articulo) async {
+  // Obtener el stock total de todos los artículos
+  Future<int> getTotalStock() async {
     try {
-      final docRef = await _collection.add(articulo.toFirestore());
-      return docRef.id;
+      final articulos = await getArticulos();
+      return articulos.fold<int>(0, (sum, articulo) => sum + articulo.stock.toInt());
     } catch (e) {
-      throw Exception('Error al agregar artículo: $e');
+      print('Error al obtener stock total: $e');
+      return 0;
     }
-  }
-
-  Future<void> actualizarArticulo(Articulo articulo) async {
-    if (articulo.firebaseId == null) return;
-    await _collection.doc(articulo.firebaseId).update(articulo.toFirestore());
-  }
-
-  Future<void> desactivarArticulo(String id) async {
-    await _collection.doc(id).update({'activo': false});
-  }
-
-  Future<List<Articulo>> buscarPorNombre(String query) async {
-    final snapshot = await _collection
-        .where('nombre', isGreaterThanOrEqualTo: query)
-        .where('nombre', isLessThanOrEqualTo: '$query\uf8ff')
-        .get();
-    return snapshot.docs.map((doc) => Articulo.fromFirestore(doc)).toList();
-  }
-
-  Future<Map<String, int>> getEstadisticas() async {
-    final snapshot = await _collection.where('activo', isEqualTo: true).get();
-    final articulosList = snapshot.docs.map((doc) => Articulo.fromFirestore(doc)).toList();
-    final totalArticulos = articulosList.length;
-    final stockTotal = articulosList.fold<int>(0, (sum, art) => sum + art.stock);
-    return {
-      'totalArticulos': totalArticulos,
-      'stockTotal': stockTotal,
-    };
-  }
-
-  Future<void> incrementarStock(String id, int cantidad) async {
-    final doc = await _collection.doc(id).get();
-    final articulo = Articulo.fromFirestore(doc);
-    await _collection.doc(id).update({'stock': articulo.stock + cantidad});
-  }
-
-  Future<void> decrementarStock(String id, int cantidad) async {
-    final doc = await _collection.doc(id).get();
-    final articulo = Articulo.fromFirestore(doc);
-    await _collection.doc(id).update({'stock': articulo.stock - cantidad});
-  }
-
-  Future<List<String>> getCategorias() async {
-    final snapshot = await _collection.get();
-    final categorias = <String>{};
-    for (final doc in snapshot.docs) {
-      final c = doc['categoria'] as String?;
-      if (c != null && c.isNotEmpty) categorias.add(c);
-    }
-    return categorias.toList();
-  }
-
-  Future<List<Articulo>> buscarArticulos(String query) async {
-    final snapshot = await _collection
-        .where('nombre', isGreaterThanOrEqualTo: query)
-        .where('nombre', isLessThanOrEqualTo: '$query\uf8ff')
-        .get();
-    return snapshot.docs.map((doc) => Articulo.fromFirestore(doc)).toList();
   }
 }

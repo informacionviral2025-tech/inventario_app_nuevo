@@ -3,150 +3,204 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum EstadoTraspaso {
   pendiente,
-  enProceso,
+  enviado,
+  recibido,
   completado,
   cancelado
 }
 
-class ItemTraspaso {
-  final String articuloId;
-  final String nombreArticulo;
-  final String codigoArticulo;
-  final int cantidad;
-
-  ItemTraspaso({
-    required this.articuloId,
-    required this.nombreArticulo,
-    required this.codigoArticulo,
-    required this.cantidad,
-  });
-
-  factory ItemTraspaso.fromMap(Map<String, dynamic> map) {
-    return ItemTraspaso(
-      articuloId: map['articuloId'] ?? '',
-      nombreArticulo: map['nombreArticulo'] ?? '',
-      codigoArticulo: map['codigoArticulo'] ?? '',
-      cantidad: map['cantidad'] ?? 0,
-    );
+extension EstadoTraspasoExtension on EstadoTraspaso {
+  String toUpperCase() {
+    switch (this) {
+      case EstadoTraspaso.pendiente:
+        return 'PENDIENTE';
+      case EstadoTraspaso.enviado:
+        return 'ENVIADO';
+      case EstadoTraspaso.recibido:
+        return 'RECIBIDO';
+      case EstadoTraspaso.completado:
+        return 'COMPLETADO';
+      case EstadoTraspaso.cancelado:
+        return 'CANCELADO';
+    }
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'articuloId': articuloId,
-      'nombreArticulo': nombreArticulo,
-      'codigoArticulo': codigoArticulo,
-      'cantidad': cantidad,
-    };
-  }
-}
-
-class Traspaso {
-  final String id;
-  final String numeroTraspaso;
-  final String almacenOrigen;
-  final String almacenDestino;
-  final List<ItemTraspaso> items;
-  final EstadoTraspaso estado;
-  final String? observaciones;
-  final DateTime fechaCreacion;
-  final DateTime? fechaCompletado;
-  final String creadoPor;
-  final String? completadoPor;
-
-  Traspaso({
-    required this.id,
-    required this.numeroTraspaso,
-    required this.almacenOrigen,
-    required this.almacenDestino,
-    required this.items,
-    required this.estado,
-    this.observaciones,
-    required this.fechaCreacion,
-    this.fechaCompletado,
-    required this.creadoPor,
-    this.completadoPor,
-  });
-
-  factory Traspaso.fromMap(Map<String, dynamic> map, String id) {
-    return Traspaso(
-      id: id,
-      numeroTraspaso: map['numeroTraspaso'] ?? '',
-      almacenOrigen: map['almacenOrigen'] ?? '',
-      almacenDestino: map['almacenDestino'] ?? '',
-      items: (map['items'] as List<dynamic>?)
-          ?.map((item) => ItemTraspaso.fromMap(item as Map<String, dynamic>))
-          .toList() ?? [],
-      estado: EstadoTraspaso.values.firstWhere(
-        (e) => e.toString().split('.').last == map['estado'],
-        orElse: () => EstadoTraspaso.pendiente,
-      ),
-      observaciones: map['observaciones'],
-      fechaCreacion: map['fechaCreacion'] is Timestamp
-          ? (map['fechaCreacion'] as Timestamp).toDate()
-          : DateTime.now(),
-      fechaCompletado: map['fechaCompletado'] is Timestamp
-          ? (map['fechaCompletado'] as Timestamp).toDate()
-          : null,
-      creadoPor: map['creadoPor'] ?? '',
-      completadoPor: map['completadoPor'],
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'numeroTraspaso': numeroTraspaso,
-      'almacenOrigen': almacenOrigen,
-      'almacenDestino': almacenDestino,
-      'items': items.map((item) => item.toMap()).toList(),
-      'estado': estado.toString().split('.').last,
-      'observaciones': observaciones,
-      'fechaCreacion': Timestamp.fromDate(fechaCreacion),
-      'fechaCompletado': fechaCompletado != null
-          ? Timestamp.fromDate(fechaCompletado!)
-          : null,
-      'creadoPor': creadoPor,
-      'completadoPor': completadoPor,
-    };
-  }
-
-  Traspaso copyWith({
-    String? id,
-    String? numeroTraspaso,
-    String? almacenOrigen,
-    String? almacenDestino,
-    List<ItemTraspaso>? items,
-    EstadoTraspaso? estado,
-    String? observaciones,
-    DateTime? fechaCreacion,
-    DateTime? fechaCompletado,
-    String? creadoPor,
-    String? completadoPor,
-  }) {
-    return Traspaso(
-      id: id ?? this.id,
-      numeroTraspaso: numeroTraspaso ?? this.numeroTraspaso,
-      almacenOrigen: almacenOrigen ?? this.almacenOrigen,
-      almacenDestino: almacenDestino ?? this.almacenDestino,
-      items: items ?? this.items,
-      estado: estado ?? this.estado,
-      observaciones: observaciones ?? this.observaciones,
-      fechaCreacion: fechaCreacion ?? this.fechaCreacion,
-      fechaCompletado: fechaCompletado ?? this.fechaCompletado,
-      creadoPor: creadoPor ?? this.creadoPor,
-      completadoPor: completadoPor ?? this.completadoPor,
-    );
-  }
-
-  String get estadoString {
-    switch (estado) {
+  String get displayName {
+    switch (this) {
       case EstadoTraspaso.pendiente:
         return 'Pendiente';
-      case EstadoTraspaso.enProceso:
-        return 'En Proceso';
+      case EstadoTraspaso.enviado:
+        return 'Enviado';
+      case EstadoTraspaso.recibido:
+        return 'Recibido';
       case EstadoTraspaso.completado:
         return 'Completado';
       case EstadoTraspaso.cancelado:
         return 'Cancelado';
     }
   }
+}
+
+class Traspaso {
+  String? id;
+  final String empresaId;
+  final String tipoOrigen;  // 'almacen' o 'obra'
+  final String origenId;
+  final String tipoDestino; // 'almacen' o 'obra'
+  final String destinoId;
+  final Map<String, int> articulos; // articuloId -> cantidad
+  final EstadoTraspaso estado;
+  final String usuario;
+  final DateTime fecha;
+  final DateTime? fechaConfirmacion;
+  final String? albaranId;
+  final String? observaciones;
+
+  Traspaso({
+    this.id,
+    required this.empresaId,
+    required this.tipoOrigen,
+    required this.origenId,
+    required this.tipoDestino,
+    required this.destinoId,
+    required this.articulos,
+    this.estado = EstadoTraspaso.pendiente,
+    required this.usuario,
+    required this.fecha,
+    this.fechaConfirmacion,
+    this.albaranId,
+    this.observaciones,
+  });
+
+  // Constructor desde Firestore
+  factory Traspaso.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    
+    // Convertir el mapa de artículos
+    Map<String, int> articulos = {};
+    if (data['articulos'] != null) {
+      final articulosData = data['articulos'] as Map<String, dynamic>;
+      articulos = articulosData.map((key, value) => MapEntry(key, value as int));
+    }
+
+    // Convertir el estado
+    EstadoTraspaso estado = EstadoTraspaso.pendiente;
+    if (data['estado'] != null) {
+      final estadoString = data['estado'] as String;
+      switch (estadoString.toLowerCase()) {
+        case 'pendiente':
+          estado = EstadoTraspaso.pendiente;
+          break;
+        case 'enviado':
+          estado = EstadoTraspaso.enviado;
+          break;
+        case 'recibido':
+          estado = EstadoTraspaso.recibido;
+          break;
+        case 'completado':
+          estado = EstadoTraspaso.completado;
+          break;
+        case 'cancelado':
+          estado = EstadoTraspaso.cancelado;
+          break;
+      }
+    }
+
+    return Traspaso(
+      id: doc.id,
+      empresaId: data['empresaId'] ?? '',
+      tipoOrigen: data['tipoOrigen'] ?? '',
+      origenId: data['origenId'] ?? '',
+      tipoDestino: data['tipoDestino'] ?? '',
+      destinoId: data['destinoId'] ?? '',
+      articulos: articulos,
+      estado: estado,
+      usuario: data['usuario'] ?? '',
+      fecha: data['fecha'] != null 
+          ? (data['fecha'] as Timestamp).toDate()
+          : DateTime.now(),
+      fechaConfirmacion: data['fechaConfirmacion'] != null
+          ? (data['fechaConfirmacion'] as Timestamp).toDate()
+          : null,
+      albaranId: data['albaranId'],
+      observaciones: data['observaciones'],
+    );
+  }
+
+  // Convertir a Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'empresaId': empresaId,
+      'tipoOrigen': tipoOrigen,
+      'origenId': origenId,
+      'tipoDestino': tipoDestino,
+      'destinoId': destinoId,
+      'articulos': articulos,
+      'estado': estado.name,
+      'usuario': usuario,
+      'fecha': Timestamp.fromDate(fecha),
+      'fechaConfirmacion': fechaConfirmacion != null
+          ? Timestamp.fromDate(fechaConfirmacion!)
+          : null,
+      'albaranId': albaranId,
+      'observaciones': observaciones,
+    };
+  }
+
+  // CopyWith para crear copias modificadas
+  Traspaso copyWith({
+    String? id,
+    String? empresaId,
+    String? tipoOrigen,
+    String? origenId,
+    String? tipoDestino,
+    String? destinoId,
+    Map<String, int>? articulos,
+    EstadoTraspaso? estado,
+    String? usuario,
+    DateTime? fecha,
+    DateTime? fechaConfirmacion,
+    String? albaranId,
+    String? observaciones,
+  }) {
+    return Traspaso(
+      id: id ?? this.id,
+      empresaId: empresaId ?? this.empresaId,
+      tipoOrigen: tipoOrigen ?? this.tipoOrigen,
+      origenId: origenId ?? this.origenId,
+      tipoDestino: tipoDestino ?? this.tipoDestino,
+      destinoId: destinoId ?? this.destinoId,
+      articulos: articulos ?? Map.from(this.articulos),
+      estado: estado ?? this.estado,
+      usuario: usuario ?? this.usuario,
+      fecha: fecha ?? this.fecha,
+      fechaConfirmacion: fechaConfirmacion ?? this.fechaConfirmacion,
+      albaranId: albaranId ?? this.albaranId,
+      observaciones: observaciones ?? this.observaciones,
+    );
+  }
+
+  // Propiedades computadas
+  bool get isPendiente => estado == EstadoTraspaso.pendiente;
+  bool get isEnviado => estado == EstadoTraspaso.enviado;
+  bool get isRecibido => estado == EstadoTraspaso.recibido;
+  bool get isCompletado => estado == EstadoTraspaso.completado;
+  bool get isCancelado => estado == EstadoTraspaso.cancelado;
+
+  int get totalArticulos => articulos.values.fold(0, (sum, cantidad) => sum + cantidad);
+
+  @override
+  String toString() {
+    return 'Traspaso{id: $id, estado: $estado, totalArticulos: $totalArticulos}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Traspaso &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

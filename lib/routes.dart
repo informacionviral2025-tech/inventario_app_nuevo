@@ -1,87 +1,139 @@
-// lib/routers.dart (actualizado)
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/entradas/entradas_screen.dart';
 import 'screens/salidas_inventario_screen.dart';
 import 'screens/traspasos/traspaso_screen.dart';
-import 'screens/proveedores/proveedores_screen.dart';
-import 'screens/articulos/articulos_screen.dart';
+import 'screens/traspasos/nuevo_traspaso_screen.dart';
 import 'screens/obra/obras_screen.dart';
 
-class AppRouter {
-  static const String login = '/login';
-  static const String home = '/home';
-  static const String entradas = '/entradas';
-  static const String salidas = '/salidas';
-  static const String traspasos = '/traspasos';
-  static const String clientes = '/clientes';
-  static const String proveedores = '/proveedores';
-  static const String articulos = '/articulos';
-  static const String obras = '/obras';
+class AppRoutes {
+  static Map<String, WidgetBuilder> routes = {
+    '/login': (context) => const LoginScreen(),
+  };
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    // Extraer argumentos si existen
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     final args = settings.arguments as Map<String, dynamic>?;
     final empresaId = args?['empresaId'] as String?;
+    final empresaNombre = args?['empresaNombre'] as String?;
 
     switch (settings.name) {
-      case home:
-        return MaterialPageRoute(
-          builder: (_) => HomeScreen(empresaId: empresaId ?? ''),
-        );
-      case login:
+      case '/':
+      case '/login':
         return MaterialPageRoute(builder: (_) => const LoginScreen());
-      case entradas:
+        
+      case '/home':
+        if (empresaId != null && empresaNombre != null) {
+          return MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              empresaId: empresaId,
+              empresaNombre: empresaNombre,
+            ),
+          );
+        }
+        // Si no hay parámetros, redirigir al login
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case '/entradas':
+        if (empresaId != null && empresaNombre != null) {
+          return MaterialPageRoute(
+            builder: (_) => EntradasScreen(
+              empresaId: empresaId,
+              empresaNombre: empresaNombre,
+            ),
+          );
+        }
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case '/salidas':
+        if (empresaId != null && empresaNombre != null) {
+          return MaterialPageRoute(
+            builder: (_) => SalidasInventarioScreen(
+              empresaId: empresaId,
+              empresaNombre: empresaNombre,
+            ),
+          );
+        }
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case '/traspasos':
         return MaterialPageRoute(
-          builder: (_) => EntradasScreen(empresaId: empresaId ?? ''),
+          builder: (_) => const TraspasoScreen(),
         );
-      case salidas:
+
+      case '/traspasos/nuevo':
         return MaterialPageRoute(
-          builder: (_) => SalidasInventarioScreen(empresaId: empresaId ?? ''),
+          builder: (_) => const NuevoTraspasoScreen(),
         );
-      case traspasos:
+
+      case '/obras':
         return MaterialPageRoute(
-          builder: (_) => TraspasoScreen(empresaId: empresaId ?? ''),
+          builder: (_) => const ObrasScreen(),
         );
-      case proveedores:
+
+      case '/inventario':
+        // Por ahora redirige a home, después se puede crear una pantalla específica
+        if (empresaId != null && empresaNombre != null) {
+          return MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              empresaId: empresaId,
+              empresaNombre: empresaNombre,
+            ),
+          );
+        }
+        return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case '/ajustes':
         return MaterialPageRoute(
-          builder: (_) => ProveedoresScreen(empresaId: empresaId ?? ''),
+          builder: (_) => const AjustesScreen(),
         );
-      case articulos:
-        return MaterialPageRoute(
-          builder: (_) => ArticulosScreen(empresaId: empresaId ?? ''),
-        );
-      case obras:
-        return MaterialPageRoute(
-          builder: (_) => ObrasScreen(empresaId: empresaId ?? ''),
-        );
+
       default:
         return MaterialPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(
-              child: Text('Página no encontrada'),
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Error')),
+            body: const Center(
+              child: Text(
+                'Página no encontrada',
+                style: TextStyle(fontSize: 18),
+              ),
             ),
           ),
         );
     }
   }
+}
 
-  // Métodos helper para navegación
-  static void goToHome(BuildContext context, String empresaId) {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      home,
-      (route) => false,
-      arguments: {'empresaId': empresaId},
-    );
-  }
+// Pantalla temporal de ajustes
+class AjustesScreen extends StatelessWidget {
+  const AjustesScreen({super.key});
 
-  static void goToObraDetail(BuildContext context, String obraId) {
-    Navigator.pushNamed(
-      context,
-      '/obra-detail',
-      arguments: {'obraId': obraId},
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ajustes'),
+        backgroundColor: Colors.grey,
+        foregroundColor: Colors.white,
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.settings, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Pantalla de Ajustes',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'En desarrollo',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

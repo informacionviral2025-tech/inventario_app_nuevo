@@ -1,420 +1,325 @@
 // lib/screens/entradas/entradas_screen.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
-import '../../models/albaran_proveedor.dart';
-import '../../services/albaran_proveedor_service.dart';
-import '../albaranes/crear_albaran_screen.dart';
-import 'detalle_albaran_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/inventory_provider.dart';
+import '../../models/articulo.dart';
 
 class EntradasScreen extends StatefulWidget {
   final String empresaId;
   final String empresaNombre;
 
   const EntradasScreen({
-    Key? key,
+    super.key,
     required this.empresaId,
     required this.empresaNombre,
-  }) : super(key: key);
+  });
 
   @override
   State<EntradasScreen> createState() => _EntradasScreenState();
 }
 
-class _EntradasScreenState extends State<EntradasScreen> 
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  final AlbaranProveedorService _albaranService = AlbaranProveedorService();
-  late TabController _tabController;
-  String _searchQuery = '';
-
-  @override
-  bool get wantKeepAlive => true;
+class _EntradasScreenState extends State<EntradasScreen> {
+  final _searchController = TextEditingController();
+  List<Articulo> _articulos = [];
+  List<Articulo> _articulosFiltrados = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _loadArticulos();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _loadArticulos() async {
+    final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
+    await inventoryProvider.loadArticulos(widget.empresaId);
+    
+    setState(() {
+      _articulos = inventoryProvider.articulos;
+      _articulosFiltrados = _articulos;
+      _isLoading = false;
+    });
+  }
+
+  void _filterArticulos(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _articulosFiltrados = _articulos;
+      } else {
+        _articulosFiltrados = _articulos.where((articulo) =>
+          articulo.descripcion.toLowerCase().contains(query.toLowerCase()) ||
+          articulo.codigo.toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Entradas de Mercancía'),
-        backgroundColor: Colors.blue,
+        title: Text('Entradas - ${widget.empresaNombre}'),
+        backgroundColor: Colors.green,
         foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(icon: Icon(Icons.pending_actions), text: 'Pendientes'),
-            Tab(icon: Icon(Icons.check_circle), text: 'Procesados'),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _mostrarBusqueda,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _crearNuevoAlbaran,
-          ),
-        ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildAlbaranesList('pendiente'),
-          _buildAlbaranesList('procesado'),
+          // Barra de búsqueda
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Buscar artículos...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: _filterArticulos,
+            ),
+          ),
+          
+          // Lista de artículos
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _articulosFiltrados.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No se encontraron artículos',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _articulosFiltrados.length,
+                        itemBuilder: (context, index) {
+                          final articulo = _articulosFiltrados[index];
+                          return _buildArticuloCard(articulo);
+                        },
+                      ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _crearNuevoAlbaran,
-        backgroundColor: Colors.blue,
+        onPressed: () => _mostrarDialogoEntradaMasiva(),
+        backgroundColor: Colors.green,
         icon: const Icon(Icons.add),
-        label: const Text('Nuevo Albarán'),
+        label: const Text('Entrada Masiva'),
       ),
     );
   }
 
-  Widget _buildAlbaranesList(String filtroEstado) {
-    return StreamBuilder<List<AlbaranProveedor>>(
-      stream: _albaranService.getAlbaranes(widget.empresaId),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _buildErrorState(snapshot.error.toString());
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final albaranes = snapshot.data ?? [];
-        final filteredAlbaranes = albaranes.where((a) => a.estado == filtroEstado).toList();
-        final searchedAlbaranes = _aplicarBusqueda(filteredAlbaranes);
-
-        if (searchedAlbaranes.isEmpty) {
-          return _buildEmptyState(filtroEstado);
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async => setState(() {}),
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: searchedAlbaranes.length,
-            itemBuilder: (context, index) {
-              final albaran = searchedAlbaranes[index];
-              return _buildAlbaranCard(albaran);
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  List<AlbaranProveedor> _aplicarBusqueda(List<AlbaranProveedor> albaranes) {
-    if (_searchQuery.isEmpty) return albaranes;
-    
-    return albaranes.where((albaran) {
-      return albaran.numeroAlbaran.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             albaran.proveedorNombre.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-  }
-
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error, size: 64, color: Colors.red),
-          const SizedBox(height: 16),
-          Text('Error: $error'),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => setState(() {}),
-            child: const Text('Reintentar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String filtroEstado) {
-    String mensaje;
-    IconData icono;
-    
-    switch (filtroEstado) {
-      case 'pendiente':
-        mensaje = _searchQuery.isEmpty 
-          ? 'No hay albaranes pendientes' 
-          : 'No se encontraron albaranes pendientes';
-        icono = Icons.pending_actions;
-        break;
-      case 'procesado':
-        mensaje = _searchQuery.isEmpty 
-          ? 'No hay albaranes procesados' 
-          : 'No se encontraron albaranes procesados';
-        icono = Icons.check_circle_outline;
-        break;
-      default:
-        mensaje = _searchQuery.isEmpty 
-          ? 'No hay albaranes' 
-          : 'No se encontraron albaranes';
-        icono = Icons.receipt_long;
-    }
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icono, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text(
-            mensaje,
-            style: const TextStyle(fontSize: 18, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-          if (_searchQuery.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Búsqueda: "$_searchQuery"',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _crearNuevoAlbaran,
-            icon: const Icon(Icons.add),
-            label: const Text('Crear Albarán'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlbaranCard(AlbaranProveedor albaran) {
+  Widget _buildArticuloCard(Articulo articulo) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: InkWell(
-        onTap: () => _verDetalles(albaran),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.green.shade100,
+          child: Text(
+            articulo.codigo.substring(0, 2).toUpperCase(),
+            style: TextStyle(
+              color: Colors.green.shade800,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        title: Text(
+          articulo.descripcion,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Código: ${articulo.codigo}'),
+            Text('Stock actual: ${articulo.stock}'),
+            if (articulo.ubicacion != null)
+              Text('Ubicación: ${articulo.ubicacion}'),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.add_circle, color: Colors.green),
+          onPressed: () => _mostrarDialogoEntrada(articulo),
+        ),
+        isThreeLine: true,
+      ),
+    );
+  }
+
+  void _mostrarDialogoEntrada(Articulo articulo) {
+    final cantidadController = TextEditingController();
+    final observacionesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Registrar Entrada'),
+        content: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Albarán #${albaran.numeroAlbaran}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: albaran.colorEstado.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      albaran.estadoTexto,
-                      style: TextStyle(
-                        color: albaran.colorEstado,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                articulo.descripcion,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.person, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      albaran.proveedorNombre,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ],
+              Text('Código: ${articulo.codigo}'),
+              Text('Stock actual: ${articulo.stock}'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: cantidadController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Cantidad a ingresar',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('dd/MM/yyyy').format(albaran.fechaAlbaran),
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.inventory, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${albaran.totalArticulos} artículos',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total: ${albaran.totalFormateado}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  if (albaran.esPendiente)
-                    ElevatedButton.icon(
-                      onPressed: () => _procesarAlbaran(albaran.id!),
-                      icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Procesar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                    ),
-                ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: observacionesController,
+                decoration: const InputDecoration(
+                  labelText: 'Observaciones (opcional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _mostrarBusqueda() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Buscar Albaranes'),
-        content: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Buscar por número o proveedor...',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (value) {
-            setState(() => _searchQuery = value);
-          },
-        ),
         actions: [
           TextButton(
-            onPressed: () {
-              setState(() => _searchQuery = '');
-              Navigator.pop(context);
-            },
-            child: const Text('Limpiar'),
-          ),
-          TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final cantidad = int.tryParse(cantidadController.text);
+              if (cantidad != null && cantidad > 0) {
+                await _registrarEntrada(
+                  articulo,
+                  cantidad,
+                  observacionesController.text,
+                );
+                if (mounted) Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ingrese una cantidad válida')),
+                );
+              }
+            },
+            child: const Text('Registrar'),
           ),
         ],
       ),
     );
   }
 
-  void _crearNuevoAlbaran() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CrearAlbaranScreen(
-          empresaId: widget.empresaId,
-          empresaNombre: widget.empresaNombre,
+  void _mostrarDialogoEntradaMasiva() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Entrada Masiva'),
+        content: const Text(
+          'Esta función permite registrar múltiples entradas de una vez. '
+          '¿Desea continuar?'
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Aquí se abriría una pantalla para entrada masiva
+              _mostrarPantallaEntradaMasiva();
+            },
+            child: const Text('Continuar'),
+          ),
+        ],
       ),
     );
-    
-    if (result == true && mounted) {
+  }
+
+  void _mostrarPantallaEntradaMasiva() {
+    // Por ahora mostrar un mensaje
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Función de entrada masiva en desarrollo'),
+      ),
+    );
+  }
+
+  Future<void> _registrarEntrada(Articulo articulo, int cantidad, String observaciones) async {
+    try {
+      final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
+      final nuevoStock = articulo.stock + cantidad;
+      
+      final articuloActualizado = articulo.copyWith(stock: nuevoStock);
+      
+      final success = await inventoryProvider.updateArticulo(articuloActualizado, widget.empresaId);
+      
+      if (success) {
+        // Actualizar la lista local
+        setState(() {
+          final index = _articulos.indexWhere((a) => a.firebaseId == articulo.firebaseId);
+          if (index != -1) {
+            _articulos[index] = articuloActualizado;
+          }
+          _filterArticulos(_searchController.text);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Entrada registrada: +$cantidad unidades'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // TODO: Aquí se podría registrar el movimiento en un historial
+        _registrarMovimiento(articulo, cantidad, 'entrada', observaciones);
+      } else {
+        throw Exception('Error al actualizar el artículo');
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Albarán creado exitosamente'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Text('Error al registrar entrada: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  void _verDetalles(AlbaranProveedor albaran) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DetalleAlbaranScreen(
-          empresaId: widget.empresaId,
-          albaran: albaran,
-        ),
-      ),
-    );
+  Future<void> _registrarMovimiento(
+    Articulo articulo,
+    int cantidad,
+    String tipo,
+    String observaciones,
+  ) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // TODO: Implementar servicio de movimientos
+      // Por ahora solo imprimir en consola
+      print('Movimiento registrado:');
+      print('Artículo: ${articulo.descripcion}');
+      print('Tipo: $tipo');
+      print('Cantidad: $cantidad');
+      print('Usuario: ${authProvider.currentUser?.displayName}');
+      print('Fecha: ${DateTime.now()}');
+      print('Observaciones: $observaciones');
+    } catch (e) {
+      print('Error al registrar movimiento: $e');
+    }
   }
 
-  Future<void> _procesarAlbaran(String albaranId) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Procesar Albarán'),
-        content: const Text(
-          '¿Confirmas que quieres procesar este albarán?\n\n'
-          'Esto actualizará el stock de los artículos incluidos.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Procesar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    try {
-      await _albaranService.procesarAlbaran(widget.empresaId, albaranId);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Albarán procesado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al procesar albarán: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }
