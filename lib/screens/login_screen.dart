@@ -1,6 +1,7 @@
-// lib/screens/login_screen.dart
+// lib/screens/login_screen.dart - VERSIÓN CORREGIDA
 import 'package:flutter/material.dart';
-import '../routes/app_routes.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -13,8 +14,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -30,19 +31,32 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
     try {
-      // Simular autenticación (reemplaza con tu lógica real)
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Por ahora, usamos un empresaId de prueba
-      const String empresaId = 'empresa_test_001';
-      
-      if (mounted) {
+      final success = await authProvider.signIn(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      if (success && mounted) {
+        // CORREGIDO: usar rutas con nombres consistentemente
         Navigator.pushReplacementNamed(
           context,
           '/home',
-          arguments: {'empresaId': empresaId},
-      );
+          arguments: {
+            'empresaId': authProvider.currentUser?.empresaId ?? 'empresa_test_001',
+            'empresaNombre': authProvider.currentUser?.empresaNombre ?? 'Empresa de Prueba',
+          },
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${authProvider.error ?? "Error desconocido"}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -50,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(
             content: Text('Error al iniciar sesión: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -213,6 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Función no implementada aún'),
+                                duration: Duration(seconds: 2),
                               ),
                             );
                           },
