@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../usuarios/gestion_usuarios_screen.dart';
 
 class ConfiguracionTab extends StatefulWidget {
   final String empresaId;
@@ -592,11 +593,10 @@ class _ConfiguracionTabState extends State<ConfiguracionTab> {
   }
 
   void _gestionarUsuarios() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('👥 Gestión de usuarios próximamente'),
-        backgroundColor: Colors.orange.shade600,
-        behavior: SnackBarBehavior.floating,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GestionUsuariosScreen(empresaId: widget.empresaId),
       ),
     );
   }

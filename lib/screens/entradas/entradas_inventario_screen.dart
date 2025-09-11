@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/articulo.dart';
+import '../etiqueta_preview.dart';
 
 class EntradaInventarioScreen extends StatefulWidget {
   final String empresaId;
@@ -26,6 +27,7 @@ class _EntradaInventarioScreenState extends State<EntradaInventarioScreen> {
   Articulo? _articuloSeleccionado;
   String _tipoEntrada = 'Compra'; // Compra, Devolución, Ajuste, Producción
   bool _procesandoEntrada = false;
+  bool _imprimirEtiqueta = false;
 
   @override
   void initState() {
@@ -167,6 +169,21 @@ class _EntradaInventarioScreenState extends State<EntradaInventarioScreen> {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
+                ),
+                const SizedBox(height: 12),
+                // Toggle imprimir etiqueta
+                Row(
+                  children: [
+                    const Icon(Icons.print, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Text('Imprimir etiqueta al registrar', style: TextStyle(color: Colors.white)),
+                    const Spacer(),
+                    Switch(
+                      value: _imprimirEtiqueta,
+                      onChanged: (v) => setState(() => _imprimirEtiqueta = v),
+                      activeColor: Colors.white,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -529,6 +546,21 @@ class _EntradaInventarioScreenState extends State<EntradaInventarioScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+
+      // Impresión opcional de etiqueta
+      if (_imprimirEtiqueta) {
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EtiquetaPreviewScreen(
+              codigo: _articuloSeleccionado!.codigo,
+              nombre: _articuloSeleccionado!.nombre,
+              empresa: widget.empresaNombre,
+            ),
+          ),
+        );
+      }
 
       setState(() {
         _articuloSeleccionado = null;

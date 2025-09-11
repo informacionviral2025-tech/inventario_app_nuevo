@@ -287,6 +287,23 @@ class _ListaAlbaranesScreenState extends State<ListaAlbaranesScreen> {
                       label: const Text('Editar'),
                     ),
                     const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/albaranes/recepcion-scan',
+                          arguments: {
+                            'empresaId': widget.empresaId,
+                            'empresaNombre': widget.empresaNombre,
+                            'albaranId': albaran.id,
+                            'numeroAlbaran': albaran.numeroAlbaran,
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Escanear'),
+                    ),
+                    const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: () => _confirmarProcesar(albaran),
                       child: const Text('Procesar'),

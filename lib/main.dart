@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
-import 'providers/inventory_provider.dart'; // NECESARIO AGREGAR ESTE
+import 'providers/unified_inventory_provider.dart';
+import 'providers/task_provider.dart';
+import 'providers/obra_provider.dart';
 import 'screens/login_screen.dart';
 import 'routes.dart';
 
@@ -19,7 +21,9 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthProvider()),
-        ChangeNotifierProvider(create: (context) => InventoryProvider()), // AGREGAR ESTO
+        ChangeNotifierProvider(create: (context) => UnifiedInventoryProvider()),
+        ChangeNotifierProvider(create: (context) => TaskProvider()),
+        ChangeNotifierProvider(create: (context) => ObraProvider()),
       ],
       child: MaterialApp(
         title: 'Inventario App',

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/task.dart';
 import '../../providers/task_provider.dart';
-import '../../widgets/task_form.dart';
+import '../../widgets/task_form_restructured.dart';
 
 class TaskDetailScreen extends StatelessWidget {
   final Task task;
@@ -25,7 +25,7 @@ class TaskDetailScreen extends StatelessWidget {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                builder: (_) => TaskForm(existingTask: task),
+                builder: (_) => TaskFormRestructured(task: task, empresaId: ''),
               );
             },
           ),
@@ -46,7 +46,7 @@ class TaskDetailScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(task.descripcion ?? "Sin descripción"),
+            Text(task.descripcion.isNotEmpty ? task.descripcion : "Sin descripción"),
             const Divider(height: 32),
 
             Text(
@@ -58,21 +58,47 @@ class TaskDetailScreen extends StatelessWidget {
             const Divider(height: 32),
 
             Text(
-              "Sección",
+              "Zona",
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(task.seccion.name.toUpperCase()),
+            Text(task.zonaTexto),
             const Divider(height: 32),
+
+            if (task.zona == TaskZone.taller && task.vehiculoMaquinaId != null) ...[
+              Text(
+                "Vehículo/Máquina",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(task.vehiculoMaquinaId!),
+              const Divider(height: 32),
+            ],
+
+            Text(
+              "Responsables",
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(task.responsables.isNotEmpty ? "${task.responsables.length} responsables asignados" : "Sin responsables asignados"),
+            const Divider(height: 32),
+
+            if (task.tipoRepeticion != TaskRepeatType.noRepetir) ...[
+              Text(
+                "Repetición",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(task.tipoRepeticionTexto),
+              const Divider(height: 32),
+            ],
 
             Text(
               "Fecha límite",
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(task.fechaLimite != null
-                ? "${task.fechaLimite!.day}/${task.fechaLimite!.month}/${task.fechaLimite!.year}"
-                : "No asignada"),
+            Text("${task.fechaVencimiento.day}/${task.fechaVencimiento.month}/${task.fechaVencimiento.year}"),
             const Divider(height: 32),
 
             Text(
@@ -80,18 +106,18 @@ class TaskDetailScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(task.completada ? "Completada ✅" : "Pendiente ⏳"),
+            Text(task.estado == TaskStatus.completada ? "Completada ✅" : "Pendiente ⏳"),
             const SizedBox(height: 20),
 
             ElevatedButton.icon(
               icon: Icon(
-                task.completada ? Icons.undo : Icons.check_circle,
+                task.estado == TaskStatus.completada ? Icons.undo : Icons.check_circle,
               ),
               label: Text(
-                task.completada ? "Marcar como pendiente" : "Marcar como completada",
+                task.estado == TaskStatus.completada ? "Marcar como pendiente" : "Marcar como completada",
               ),
               onPressed: () {
-                provider.toggleTaskCompletion(task.id);
+                provider.toggleTaskCompletion(task.id, '');
                 Navigator.of(context).pop(); // Volvemos tras actualizar
               },
             ),
@@ -115,7 +141,7 @@ class TaskDetailScreen extends StatelessWidget {
           ElevatedButton(
             child: const Text("Eliminar"),
             onPressed: () {
-              provider.deleteTask(task.id);
+              provider.deleteTask(task.id, '');
               Navigator.of(ctx).pop();
               Navigator.of(context).pop();
             },

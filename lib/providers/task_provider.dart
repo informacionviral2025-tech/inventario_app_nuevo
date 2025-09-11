@@ -52,9 +52,13 @@ class TaskProvider with ChangeNotifier {
         descripcion: task.descripcion,
         fechaVencimiento: task.fechaVencimiento,
         prioridad: task.prioridad,
-        asignadoA: task.asignadoA,
+        responsables: task.responsables,
+        zona: task.zona,
+        vehiculoMaquinaId: task.vehiculoMaquinaId,
         estado: task.estado,
         fechaCreacion: task.fechaCreacion,
+        tipoRepeticion: task.tipoRepeticion,
+        proximaRepeticion: task.proximaRepeticion,
       );
 
       _tasks.insert(0, newTask);
@@ -105,10 +109,14 @@ class TaskProvider with ChangeNotifier {
         descripcion: task.descripcion,
         fechaVencimiento: task.fechaVencimiento,
         prioridad: task.prioridad,
-        asignadoA: task.asignadoA,
+        responsables: task.responsables,
+        zona: task.zona,
+        vehiculoMaquinaId: task.vehiculoMaquinaId,
         estado: newStatus,
         fechaCreacion: task.fechaCreacion,
         fechaCompletada: newStatus == TaskStatus.completada ? DateTime.now() : null,
+        tipoRepeticion: task.tipoRepeticion,
+        proximaRepeticion: task.proximaRepeticion,
       );
 
       await _firestore

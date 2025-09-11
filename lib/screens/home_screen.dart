@@ -2,7 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/inventory_provider.dart';
+import '../providers/unified_inventory_provider.dart';
+import '../widgets/sync_status_widget.dart';
+import '../widgets/advanced_stats_widget.dart';
+import '../widgets/tasks_stats_widget.dart';
+import '../widgets/obras_stats_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   final String empresaId;
@@ -24,15 +28,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Cargar los artículos al inicializar
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<InventoryProvider>(context, listen: false)
-          .loadArticulos(widget.empresaId);
+      final provider = Provider.of<UnifiedInventoryProvider>(context, listen: false);
+      provider.setEmpresa(widget.empresaId, widget.empresaNombre);
+      provider.loadArticulos();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final inventoryProvider = Provider.of<InventoryProvider>(context);
+    final inventoryProvider = Provider.of<UnifiedInventoryProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -40,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
+          const SyncButton(),
+          const SyncStatusWidget(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -53,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await inventoryProvider.loadArticulos(widget.empresaId);
+          await inventoryProvider.loadArticulos(forceRefresh: true);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -66,6 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildStatsCards(inventoryProvider),
               const SizedBox(height: 20),
               _buildQuickActions(),
+              const SizedBox(height: 20),
+              const AdvancedStatsWidget(),
+              const SizedBox(height: 20),
+              TasksStatsWidget(empresaId: widget.empresaId),
+              const SizedBox(height: 20),
+              ObrasStatsWidget(empresaId: widget.empresaId),
               const SizedBox(height: 20),
               _buildRecentActivity(),
             ],
@@ -122,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsCards(InventoryProvider inventoryProvider) {
+  Widget _buildStatsCards(UnifiedInventoryProvider inventoryProvider) {
     if (inventoryProvider.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -132,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: _buildStatCard(
             'Total Artículos',
-            '${inventoryProvider.articulos.length}',
+            '${inventoryProvider.totalArticulos}',
             Icons.inventory,
             Colors.green,
           ),
@@ -150,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: _buildStatCard(
             'Stock Bajo',
-            '${inventoryProvider.articulosStockBajo.length}',
+            '${inventoryProvider.articulosStockBajo}',
             Icons.warning,
             Colors.orange,
           ),
@@ -210,10 +223,10 @@ class _HomeScreenState extends State<HomeScreen> {
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
+          crossAxisCount: 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.5,
+          childAspectRatio: 1.2,
           children: [
             _buildActionCard(
               'Entradas',
@@ -264,6 +277,97 @@ class _HomeScreenState extends State<HomeScreen> {
                 arguments: {
                   'empresaId': widget.empresaId,
                   'empresaNombre': widget.empresaNombre,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Albaranes',
+              Icons.receipt_long,
+              Colors.amber,
+              () => Navigator.pushNamed(
+                context,
+                '/albaranes',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                  'empresaNombre': widget.empresaNombre,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Proveedores',
+              Icons.local_shipping,
+              Colors.cyan,
+              () => Navigator.pushNamed(
+                context,
+                '/proveedores',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Clientes',
+              Icons.people,
+              Colors.pink,
+              () => Navigator.pushNamed(
+                context,
+                '/clientes',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Escáner',
+              Icons.qr_code_scanner,
+              Colors.indigo,
+              () => _mostrarOpcionesScanner(),
+            ),
+            _buildActionCard(
+              'Tareas',
+              Icons.task_alt,
+              Colors.teal,
+              () => Navigator.pushNamed(
+                context,
+                '/tasks',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Obras',
+              Icons.construction,
+              Colors.brown,
+              () => Navigator.pushNamed(
+                context,
+                '/obras',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Reportes',
+              Icons.assessment,
+              Colors.indigo,
+              () => Navigator.pushNamed(
+                context,
+                '/reportes',
+                arguments: {
+                  'empresaId': widget.empresaId,
+                },
+              ),
+            ),
+            _buildActionCard(
+              'Ajustes',
+              Icons.settings,
+              Colors.grey,
+              () => Navigator.pushNamed(
+                context,
+                '/ajustes',
+                arguments: {
+                  'empresaId': widget.empresaId,
                 },
               ),
             ),
@@ -403,6 +507,76 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _mostrarOpcionesScanner() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Opciones del Escáner',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.add_circle, color: Colors.green),
+              title: const Text('Entrada de Stock'),
+              subtitle: const Text('Escanear para agregar stock'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(
+                  context,
+                  '/scanner/entrada',
+                  arguments: {
+                    'empresaId': widget.empresaId,
+                    'empresaNombre': widget.empresaNombre,
+                  },
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.remove_circle, color: Colors.red),
+              title: const Text('Salida de Stock'),
+              subtitle: const Text('Escanear para retirar stock'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(
+                  context,
+                  '/scanner/salida',
+                  arguments: {
+                    'empresaId': widget.empresaId,
+                    'empresaNombre': widget.empresaNombre,
+                  },
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.search, color: Colors.blue),
+              title: const Text('Búsqueda'),
+              subtitle: const Text('Escanear para buscar información'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(
+                  context,
+                  '/scanner/busqueda',
+                  arguments: {
+                    'empresaId': widget.empresaId,
+                    'empresaNombre': widget.empresaNombre,
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNavigationBar() {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
@@ -418,8 +592,12 @@ class _HomeScreenState extends State<HomeScreen> {
           label: 'Inventario',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.swap_horiz),
-          label: 'Traspasos',
+          icon: Icon(Icons.task_alt),
+          label: 'Tareas',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.construction),
+          label: 'Obras',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.settings),
@@ -444,14 +622,22 @@ class _HomeScreenState extends State<HomeScreen> {
           case 2:
             Navigator.pushNamed(
               context,
-              '/traspasos',
+              '/tasks',
               arguments: {
                 'empresaId': widget.empresaId,
-                'empresaNombre': widget.empresaNombre,
               },
             );
             break;
           case 3:
+            Navigator.pushNamed(
+              context,
+              '/obras',
+              arguments: {
+                'empresaId': widget.empresaId,
+              },
+            );
+            break;
+          case 4:
             Navigator.pushNamed(context, '/ajustes');
             break;
         }

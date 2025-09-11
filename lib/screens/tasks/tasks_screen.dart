@@ -5,12 +5,17 @@ import 'package:provider/provider.dart';
 import '../../models/task.dart';
 import '../../providers/task_provider.dart';
 import 'task_detail_screen.dart';
-import '../../widgets/task_form.dart';
+import '../../widgets/task_form_restructured.dart';
 
 enum TaskSort { none, fechaLimite, prioridad, estado }
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  final String empresaId;
+  
+  const TasksScreen({
+    super.key,
+    required this.empresaId,
+  });
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -19,7 +24,7 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   // Filtros (null = "todas")
   TaskPriority? _priorityFilter;
-  TaskSection? _sectionFilter;
+  TaskStatus? _statusFilter;
   bool? _completedFilter; // null = todos, false = pendientes, true = completados
 
   // Ordenamiento
@@ -31,6 +36,16 @@ class _TasksScreenState extends State<TasksScreen> {
 
   // Helpers para UI
   final EdgeInsets _chipPadding = const EdgeInsets.symmetric(horizontal: 6, vertical: 4);
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargar tareas al inicializar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<TaskProvider>(context, listen: false);
+      provider.loadTasks(widget.empresaId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +133,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _buildSummaryChip(TaskProvider provider) {
     final total = provider.tasks.length;
-    final pending = provider.tasks.where((t) => !t.completada).length;
+    final pending = provider.tasks.where((t) => t.estado != TaskStatus.completada).length;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -150,14 +165,14 @@ class _TasksScreenState extends State<TasksScreen> {
         const SizedBox(width: 6),
 
         // Sections (single-select)
-        ...TaskSection.values.map((s) {
-          final selected = _sectionFilter == s;
+        ...TaskStatus.values.map((s) {
+          final selected = _statusFilter == s;
           return Padding(
             padding: _chipPadding,
             child: FilterChip(
               label: Text(s.name.toUpperCase()),
               selected: selected,
-              onSelected: (v) => setState(() => _sectionFilter = v ? s : null),
+              onSelected: (v) => setState(() => _statusFilter = v ? s : null),
               selectedColor: Colors.blueGrey.shade100,
             ),
           );
@@ -237,8 +252,11 @@ class _TasksScreenState extends State<TasksScreen> {
     // Filtro por prioridad / sección / completada / búsqueda
     final filtered = src.where((t) {
       if (_priorityFilter != null && t.prioridad != _priorityFilter) return false;
-      if (_sectionFilter != null && t.seccion != _sectionFilter) return false;
-      if (_completedFilter != null && t.completada != _completedFilter) return false;
+      if (_statusFilter != null && t.estado != _statusFilter) return false;
+      if (_completedFilter != null) {
+        final isCompleted = t.estado == TaskStatus.completada;
+        if (isCompleted != _completedFilter) return false;
+      }
       if (_search.isNotEmpty) {
         final hay = t.titulo.toLowerCase().contains(_search) ||
             (t.descripcion?.toLowerCase().contains(_search) ?? false);
@@ -251,14 +269,14 @@ class _TasksScreenState extends State<TasksScreen> {
     switch (_sortBy) {
       case TaskSort.fechaLimite:
         filtered.sort((a, b) {
-          final aNull = a.fechaLimite == null;
-          final bNull = b.fechaLimite == null;
+          final aNull = a.fechaVencimiento == null;
+          final bNull = b.fechaVencimiento == null;
           if (aNull && bNull) return 0;
           if (aNull) return _sortAscending ? 1 : -1;
           if (bNull) return _sortAscending ? -1 : 1;
           return _sortAscending
-              ? a.fechaLimite!.compareTo(b.fechaLimite!)
-              : b.fechaLimite!.compareTo(a.fechaLimite!);
+              ? a.fechaVencimiento.compareTo(b.fechaVencimiento)
+              : b.fechaVencimiento.compareTo(a.fechaVencimiento);
         });
         break;
       case TaskSort.prioridad:
@@ -270,8 +288,8 @@ class _TasksScreenState extends State<TasksScreen> {
       case TaskSort.estado:
         // pendientes (completada=false) primero when ascending
         filtered.sort((a, b) {
-          final av = a.completada ? 1 : 0;
-          final bv = b.completada ? 1 : 0;
+          final av = a.estado == TaskStatus.completada ? 1 : 0;
+          final bv = b.estado == TaskStatus.completada ? 1 : 0;
           return _sortAscending ? av.compareTo(bv) : bv.compareTo(av);
         });
         break;
@@ -281,14 +299,8 @@ class _TasksScreenState extends State<TasksScreen> {
           final pa = a.prioridad.index;
           final pb = b.prioridad.index;
           if (pa != pb) return pa.compareTo(pb);
-          if (a.fechaLimite != null && b.fechaLimite != null) {
-            final cmp = a.fechaLimite!.compareTo(b.fechaLimite!);
-            if (cmp != 0) return cmp;
-          } else if (a.fechaLimite == null && b.fechaLimite != null) {
-            return 1;
-          } else if (a.fechaLimite != null && b.fechaLimite == null) {
-            return -1;
-          }
+          final cmp = a.fechaVencimiento.compareTo(b.fechaVencimiento);
+          if (cmp != 0) return cmp;
           return b.fechaCreacion.compareTo(a.fechaCreacion);
         });
         break;
@@ -309,8 +321,8 @@ class _TasksScreenState extends State<TasksScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Checkbox(
-              value: t.completada,
-              onChanged: (v) => provider.toggleTask(t.id),
+              value: t.estado == TaskStatus.completada,
+              onChanged: (v) => provider.toggleTaskCompletion(t.id, widget.empresaId),
             ),
           ],
         ),
@@ -318,24 +330,34 @@ class _TasksScreenState extends State<TasksScreen> {
           t.titulo,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            decoration: t.completada ? TextDecoration.lineThrough : null,
+            decoration: t.estado == TaskStatus.completada ? TextDecoration.lineThrough : null,
           ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (t.descripcion?.isNotEmpty == true) Text(t.descripcion!, maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (t.descripcion.isNotEmpty) Text(t.descripcion, maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
               children: [
                 _smallChip(t.prioridad.name.toUpperCase(), color.withOpacity(0.12), color),
-                _smallChip(t.seccion.name.toUpperCase(), Colors.blueGrey.shade100, Colors.blueGrey),
-                _smallChip(t.fechaLimite != null ? 'Vence: ${_fmtDate(t.fechaLimite!)}' : 'Sin límite', Colors.grey.shade100, Colors.grey),
-                if (!t.completada && t.fechaLimite != null && t.fechaLimite!.isBefore(DateTime.now()))
+                _smallChip(t.estado.name.toUpperCase(), Colors.blueGrey.shade100, Colors.blueGrey),
+                _smallChip(t.zonaTexto, Colors.blue.shade100, Colors.blue),
+                _smallChip('Vence: ${_fmtDate(t.fechaVencimiento)}', Colors.grey.shade100, Colors.grey),
+                if (t.tipoRepeticion != TaskRepeatType.noRepetir)
+                  _smallChip('Rep: ${t.tipoRepeticionTexto}', Colors.purple.shade100, Colors.purple),
+                if (t.estado != TaskStatus.completada && t.fechaVencimiento.isBefore(DateTime.now()))
                   _smallChip('VENCIDA', Colors.red.shade100, Colors.red),
               ],
             ),
+            if (t.responsables.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Responsables: ${t.responsables.length}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
           ],
         ),
         trailing: PopupMenuButton<String>(
@@ -355,7 +377,7 @@ class _TasksScreenState extends State<TasksScreen> {
       showModalBottomSheet(
         context: ctx,
         isScrollControlled: true,
-        builder: (_) => TaskForm(existingTask: t),
+        builder: (_) => TaskFormRestructured(task: t, empresaId: widget.empresaId),
       );
     } else if (choice == 'detail') {
       Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => TaskDetailScreen(task: t)));
@@ -374,7 +396,7 @@ class _TasksScreenState extends State<TasksScreen> {
           TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              provider.deleteTask(t.id);
+              provider.deleteTask(t.id, widget.empresaId);
               Navigator.of(dctx).pop();
             },
             child: const Text('Eliminar'),
@@ -388,7 +410,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Color _priorityColor(TaskPriority p) {
     switch (p) {
-      case TaskPriority.urgente:
+      case TaskPriority.critica:
         return Colors.red.shade600;
       case TaskPriority.alta:
         return Colors.orange.shade700;
@@ -432,14 +454,14 @@ class _TasksScreenState extends State<TasksScreen> {
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
-      builder: (_) => const TaskForm(),
+      builder: (_) => TaskFormRestructured(empresaId: widget.empresaId),
     );
   }
 
   void _clearAllFilters() {
     setState(() {
       _priorityFilter = null;
-      _sectionFilter = null;
+      _statusFilter = null;
       _completedFilter = null;
       _search = '';
       _sortBy = TaskSort.none;

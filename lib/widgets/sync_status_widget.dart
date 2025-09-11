@@ -1,197 +1,211 @@
 // lib/widgets/sync_status_widget.dart
 import 'package:flutter/material.dart';
-import '../services/sync_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/unified_inventory_provider.dart';
+import '../services/unified_sync_service.dart';
 
-class SyncStatusWidget extends StatefulWidget {
-  final VoidCallback? onSyncPressed;
-  final bool showDetails;
-
-  const SyncStatusWidget({
-    super.key,
-    this.onSyncPressed,
-    this.showDetails = true,
-  });
-
-  @override
-  State<SyncStatusWidget> createState() => _SyncStatusWidgetState();
-}
-
-class _SyncStatusWidgetState extends State<SyncStatusWidget> {
-  final SyncService _syncService = SyncService();
-  SyncInfo? _syncInfo;
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSyncInfo();
-    
-    // Escuchar cambios en el estado de sincronización
-    _syncService.syncStatusStream.listen((_) {
-      _loadSyncInfo();
-    });
-  }
-
-  Future<void> _loadSyncInfo() async {
-    try {
-      final info = await _syncService.getSyncInfo();
-      if (mounted) {
-        setState(() {
-          _syncInfo = info;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _syncInfo = SyncInfo(
-            hasInternetConnection: false,
-            isSyncing: false,
-            pendingSyncCount: 0,
-            conflictedCount: 0,
-            lastSync: null,
-          );
-        });
-      }
-    }
-  }
-
-  Future<void> _handleSync() async {
-    if (_isLoading) return;
-    
-    setState(() => _isLoading = true);
-    try {
-      if (widget.onSyncPressed != null) {
-        await widget.onSyncPressed!();
-      } else {
-        await _syncService.syncAll();
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
+class SyncStatusWidget extends StatelessWidget {
+  const SyncStatusWidget({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (_syncInfo == null) {
-      return const SizedBox.shrink();
-    }
-
-    return GestureDetector(
-      onTap: _syncInfo!.hasInternetConnection && !_syncInfo!.isSyncing ? _handleSync : null,
-      child: Container(
-        margin: const EdgeInsets.all(8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return StreamBuilder<SyncStatus>(
+      stream: UnifiedSyncService().statusStream,
+      builder: (context, snapshot) {
+        final status = snapshot.data ?? SyncStatus.idle;
+        
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _getStatusColor().withOpacity(0.1),
-          border: Border.all(color: _getStatusColor()),
-          borderRadius: BorderRadius.circular(8),
+            color: _getStatusColor(status).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _getStatusColor(status).withOpacity(0.3),
+              width: 1,
+            ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _isLoading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(_getStatusColor()),
-                    ),
-                  )
-                : Icon(
-                    _getStatusIcon(),
-                    size: 16,
-                    color: _getStatusColor(),
-                  ),
+              _buildStatusIcon(status),
             const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
                   Text(
-                    _getStatusText(),
+                _getStatusText(status),
                     style: TextStyle(
-                      color: _getStatusColor(),
+                  color: _getStatusColor(status),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (widget.showDetails && (_syncInfo!.pendingSyncCount > 0 || _syncInfo!.conflictedCount > 0))
-                    Text(
-                      _getDetailsText(),
-                      style: TextStyle(
-                        color: _getStatusColor().withOpacity(0.7),
-                        fontSize: 10,
-                      ),
-                    ),
-                  if (_syncInfo!.lastSync != null && widget.showDetails)
-                    Text(
-                      'Última sync: ${_formatLastSync(_syncInfo!.lastSync!)}',
-                      style: TextStyle(
-                        color: _getStatusColor().withOpacity(0.7),
-                        fontSize: 10,
+              if (status == SyncStatus.syncing) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(_getStatusColor(status)),
                       ),
                     ),
                 ],
-              ),
-            ),
-            if (_syncInfo!.hasInternetConnection && !_syncInfo!.isSyncing && !_isLoading)
-              Icon(
-                Icons.refresh,
-                size: 16,
-                color: _getStatusColor(),
-              ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Color _getStatusColor() {
-    if (_syncInfo!.isSyncing || _isLoading) return Colors.blue;
-    if (!_syncInfo!.hasInternetConnection) return Colors.grey;
-    if (_syncInfo!.conflictedCount > 0) return Colors.red;
-    if (_syncInfo!.pendingSyncCount > 0) return Colors.orange;
-    return Colors.green;
+  Widget _buildStatusIcon(SyncStatus status) {
+    switch (status) {
+      case SyncStatus.idle:
+        return Icon(
+          Icons.cloud_done,
+          size: 16,
+          color: _getStatusColor(status),
+        );
+      case SyncStatus.syncing:
+        return Icon(
+          Icons.sync,
+          size: 16,
+          color: _getStatusColor(status),
+        );
+      case SyncStatus.success:
+        return Icon(
+          Icons.check_circle,
+          size: 16,
+          color: _getStatusColor(status),
+        );
+      case SyncStatus.error:
+        return Icon(
+          Icons.error,
+          size: 16,
+          color: _getStatusColor(status),
+        );
+      case SyncStatus.offline:
+        return Icon(
+          Icons.cloud_off,
+          size: 16,
+          color: _getStatusColor(status),
+        );
+    }
   }
 
-  IconData _getStatusIcon() {
-    if (_syncInfo!.isSyncing) return Icons.sync;
-    if (!_syncInfo!.hasInternetConnection) return Icons.wifi_off;
-    if (_syncInfo!.conflictedCount > 0) return Icons.error_outline;
-    if (_syncInfo!.pendingSyncCount > 0) return Icons.cloud_upload;
-    return Icons.cloud_done;
+  Color _getStatusColor(SyncStatus status) {
+    switch (status) {
+      case SyncStatus.idle:
+        return Colors.grey;
+      case SyncStatus.syncing:
+        return Colors.blue;
+      case SyncStatus.success:
+        return Colors.green;
+      case SyncStatus.error:
+        return Colors.red;
+      case SyncStatus.offline:
+        return Colors.orange;
+    }
   }
 
-  String _getStatusText() {
-    if (_syncInfo!.isSyncing) return 'Sincronizando...';
-    if (!_syncInfo!.hasInternetConnection) return 'Sin conexión';
-    if (_syncInfo!.conflictedCount > 0) return 'Conflictos detectados';
-    if (_syncInfo!.pendingSyncCount > 0) return 'Pendiente sincronización';
+  String _getStatusText(SyncStatus status) {
+    switch (status) {
+      case SyncStatus.idle:
     return 'Sincronizado';
+      case SyncStatus.syncing:
+        return 'Sincronizando...';
+      case SyncStatus.success:
+        return 'Actualizado';
+      case SyncStatus.error:
+        return 'Error';
+      case SyncStatus.offline:
+        return 'Sin conexión';
+    }
+  }
+}
+
+class SyncButton extends StatelessWidget {
+  const SyncButton({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<SyncStatus>(
+      stream: UnifiedSyncService().statusStream,
+      builder: (context, snapshot) {
+        final status = snapshot.data ?? SyncStatus.idle;
+        final isSyncing = status == SyncStatus.syncing;
+        
+        return IconButton(
+          icon: isSyncing 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.sync),
+          onPressed: isSyncing ? null : () => _sync(context),
+          tooltip: 'Sincronizar',
+        );
+      },
+    );
   }
 
-  String _getDetailsText() {
-    final pending = _syncInfo!.pendingSyncCount;
-    final conflicts = _syncInfo!.conflictedCount;
-    
-    List<String> details = [];
-    if (pending > 0) details.add('$pending pendientes');
-    if (conflicts > 0) details.add('$conflicts conflictos');
-    
-    return details.join(' • ');
+  void _sync(BuildContext context) {
+    final provider = Provider.of<UnifiedInventoryProvider>(context, listen: false);
+    provider.sincronizar();
   }
+}
 
-  String _formatLastSync(DateTime lastSync) {
-    final now = DateTime.now();
-    final difference = now.difference(lastSync);
-    
-    if (difference.inMinutes < 1) return 'ahora mismo';
-    if (difference.inMinutes < 60) return 'hace ${difference.inMinutes} min';
-    if (difference.inHours < 24) return 'hace ${difference.inHours} h';
-    return 'hace ${difference.inDays} días';
+class SyncResultDialog extends StatelessWidget {
+  final SyncResult result;
+
+  const SyncResultDialog({
+    Key? key,
+    required this.result,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            result.success ? Icons.check_circle : Icons.error,
+            color: result.success ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(result.success ? 'Sincronización Exitosa' : 'Error en Sincronización'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(result.message),
+          if (result.itemsSynced > 0) ...[
+            const SizedBox(height: 8),
+            Text('Elementos sincronizados: ${result.itemsSynced}'),
+          ],
+          if (result.errors.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Errores:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...result.errors.map((error) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '• $error',
+                style: const TextStyle(fontSize: 12, color: Colors.red),
+              ),
+            )),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    );
   }
 }

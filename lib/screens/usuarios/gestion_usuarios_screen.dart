@@ -1,20 +1,21 @@
-// lib/screens/clientes/clientes_screen.dart
+// lib/screens/usuarios/gestion_usuarios_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class ClientesScreen extends StatefulWidget {
+class GestionUsuariosScreen extends StatefulWidget {
   final String empresaId;
 
-  const ClientesScreen({
+  const GestionUsuariosScreen({
     super.key,
     required this.empresaId,
   });
 
   @override
-  State<ClientesScreen> createState() => _ClientesScreenState();
+  State<GestionUsuariosScreen> createState() => _GestionUsuariosScreenState();
 }
 
-class _ClientesScreenState extends State<ClientesScreen> {
+class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -28,8 +29,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestión de Clientes'),
-        backgroundColor: Colors.pink.shade600,
+        title: const Text('Gestión de Usuarios'),
+        backgroundColor: Colors.purple.shade600,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -41,12 +42,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
       body: Column(
         children: [
           _buildFiltros(),
-          Expanded(child: _buildListaClientes()),
+          Expanded(child: _buildListaUsuarios()),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _mostrarFormularioCliente(context),
-        backgroundColor: Colors.pink.shade600,
+        onPressed: () => _mostrarFormularioUsuario(context),
+        backgroundColor: Colors.purple.shade600,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -61,7 +62,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Buscar clientes...',
+                hintText: 'Buscar usuarios...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -87,12 +88,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
   }
 
-  Widget _buildListaClientes() {
+  Widget _buildListaUsuarios() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('empresas')
           .doc(widget.empresaId)
-          .collection('clientes')
+          .collection('usuarios')
           .orderBy('nombre')
           .snapshots(),
       builder: (context, snapshot) {
@@ -108,41 +109,42 @@ class _ClientesScreenState extends State<ClientesScreen> {
           return _buildEmptyState();
         }
 
-        final clientes = snapshot.data!.docs.where((doc) {
+        final usuarios = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final nombre = data['nombre']?.toString().toLowerCase() ?? '';
-          return nombre.contains(_searchQuery);
+          final email = data['email']?.toString().toLowerCase() ?? '';
+          return nombre.contains(_searchQuery) || email.contains(_searchQuery);
         }).toList();
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: clientes.length,
+          itemCount: usuarios.length,
           itemBuilder: (context, index) {
-            final doc = clientes[index];
+            final doc = usuarios[index];
             final data = doc.data() as Map<String, dynamic>;
-            return _buildClienteCard(doc.id, data);
+            return _buildUsuarioCard(doc.id, data);
           },
         );
       },
     );
   }
 
-  Widget _buildClienteCard(String clienteId, Map<String, dynamic> data) {
+  Widget _buildUsuarioCard(String usuarioId, Map<String, dynamic> data) {
     final nombre = data['nombre'] ?? 'Sin nombre';
     final email = data['email'] ?? '';
-    final telefono = data['telefono'] ?? '';
-    final direccion = data['direccion'] ?? '';
+    final rol = data['rol'] ?? 'Usuario';
     final activo = data['activo'] ?? true;
+    final ultimoAcceso = data['ultimoAcceso'];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.pink.shade100,
+          backgroundColor: Colors.purple.shade100,
           child: Text(
-            nombre.isNotEmpty ? nombre[0].toUpperCase() : 'C',
+            nombre.isNotEmpty ? nombre[0].toUpperCase() : 'U',
             style: TextStyle(
-              color: Colors.pink.shade700,
+              color: Colors.purple.shade700,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -154,42 +156,43 @@ class _ClientesScreenState extends State<ClientesScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (email.isNotEmpty) Text('📧 $email'),
-            if (telefono.isNotEmpty) Text('📞 $telefono'),
-            if (direccion.isNotEmpty) Text('📍 $direccion'),
+            Text('📧 $email'),
+            Text('👤 $rol'),
+            if (ultimoAcceso != null)
+              Text('🕒 Último acceso: ${_formatDate(ultimoAcceso)}'),
           ],
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!activo)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Inactivo',
-                  style: TextStyle(
-                    color: Colors.red.shade700,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: activo ? Colors.green.shade100 : Colors.red.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                activo ? 'Activo' : 'Inactivo',
+                style: TextStyle(
+                  color: activo ? Colors.green.shade700 : Colors.red.shade700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
+            ),
             PopupMenuButton<String>(
-              onSelected: (value) => _onMenuAction(value, clienteId, data),
+              onSelected: (value) => _onMenuAction(value, usuarioId, data),
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'edit', child: Text('Editar')),
                 const PopupMenuItem(value: 'view', child: Text('Ver detalles')),
+                const PopupMenuItem(value: 'permissions', child: Text('Permisos')),
                 const PopupMenuItem(value: 'toggle', child: Text('Activar/Desactivar')),
                 const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
               ],
             ),
           ],
         ),
-        onTap: () => _verDetallesCliente(clienteId, data),
+        onTap: () => _verDetallesUsuario(usuarioId, data),
       ),
     );
   }
@@ -206,7 +209,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No hay clientes registrados',
+            'No hay usuarios registrados',
             style: TextStyle(
               fontSize: 18,
               color: Colors.grey.shade600,
@@ -214,18 +217,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Agrega tu primer cliente',
+            'Agrega el primer usuario',
             style: TextStyle(
               color: Colors.grey.shade500,
             ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => _mostrarFormularioCliente(context),
+            onPressed: () => _mostrarFormularioUsuario(context),
             icon: const Icon(Icons.add),
-            label: const Text('Agregar Cliente'),
+            label: const Text('Agregar Usuario'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.pink.shade600,
+              backgroundColor: Colors.purple.shade600,
               foregroundColor: Colors.white,
             ),
           ),
@@ -238,11 +241,11 @@ class _ClientesScreenState extends State<ClientesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Buscar Clientes'),
+        title: const Text('Buscar Usuarios'),
         content: TextField(
           controller: _searchController,
           decoration: const InputDecoration(
-            hintText: 'Nombre, email o teléfono...',
+            hintText: 'Nombre o email...',
             prefixIcon: Icon(Icons.search),
           ),
           autofocus: true,
@@ -257,63 +260,66 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
   }
 
-  void _mostrarFormularioCliente(BuildContext context) {
+  void _mostrarFormularioUsuario(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => _ClienteFormDialog(
+      builder: (context) => _UsuarioFormDialog(
         empresaId: widget.empresaId,
-        onClienteSaved: () {
+        onUsuarioSaved: () {
           setState(() {});
         },
       ),
     );
   }
 
-  void _onMenuAction(String action, String clienteId, Map<String, dynamic> data) {
+  void _onMenuAction(String action, String usuarioId, Map<String, dynamic> data) {
     switch (action) {
       case 'edit':
-        _editarCliente(clienteId, data);
+        _editarUsuario(usuarioId, data);
         break;
       case 'view':
-        _verDetallesCliente(clienteId, data);
+        _verDetallesUsuario(usuarioId, data);
+        break;
+      case 'permissions':
+        _gestionarPermisos(usuarioId, data);
         break;
       case 'toggle':
-        _toggleActivo(clienteId, data);
+        _toggleActivo(usuarioId, data);
         break;
       case 'delete':
-        _eliminarCliente(clienteId);
+        _eliminarUsuario(usuarioId);
         break;
     }
   }
 
-  void _editarCliente(String clienteId, Map<String, dynamic> data) {
+  void _editarUsuario(String usuarioId, Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (context) => _ClienteFormDialog(
+      builder: (context) => _UsuarioFormDialog(
         empresaId: widget.empresaId,
-        clienteId: clienteId,
-        clienteData: data,
-        onClienteSaved: () {
+        usuarioId: usuarioId,
+        usuarioData: data,
+        onUsuarioSaved: () {
           setState(() {});
         },
       ),
     );
   }
 
-  void _verDetallesCliente(String clienteId, Map<String, dynamic> data) {
+  void _verDetallesUsuario(String usuarioId, Map<String, dynamic> data) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(data['nombre'] ?? 'Cliente'),
+        title: Text(data['nombre'] ?? 'Usuario'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailRow('Email', data['email'] ?? 'No especificado'),
-            _buildDetailRow('Teléfono', data['telefono'] ?? 'No especificado'),
-            _buildDetailRow('Dirección', data['direccion'] ?? 'No especificada'),
+            _buildDetailRow('Rol', data['rol'] ?? 'Usuario'),
             _buildDetailRow('Estado', data['activo'] == true ? 'Activo' : 'Inactivo'),
             _buildDetailRow('Fecha registro', _formatDate(data['fechaCreacion'])),
+            _buildDetailRow('Último acceso', _formatDate(data['ultimoAcceso'])),
           ],
         ),
         actions: [
@@ -333,7 +339,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 80,
+            width: 100,
             child: Text(
               '$label:',
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -353,30 +359,46 @@ class _ClientesScreenState extends State<ClientesScreen> {
     return 'No especificada';
   }
 
-  void _toggleActivo(String clienteId, Map<String, dynamic> data) {
+  void _gestionarPermisos(String usuarioId, Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gestionar Permisos'),
+        content: const Text('Esta funcionalidad permitirá gestionar los permisos específicos del usuario.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleActivo(String usuarioId, Map<String, dynamic> data) {
     final nuevoEstado = !(data['activo'] ?? true);
     FirebaseFirestore.instance
         .collection('empresas')
         .doc(widget.empresaId)
-        .collection('clientes')
-        .doc(clienteId)
+        .collection('usuarios')
+        .doc(usuarioId)
         .update({'activo': nuevoEstado})
         .then((_) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(nuevoEstado ? 'Cliente activado' : 'Cliente desactivado'),
+          content: Text(nuevoEstado ? 'Usuario activado' : 'Usuario desactivado'),
           backgroundColor: Colors.green,
         ),
       );
     });
   }
 
-  void _eliminarCliente(String clienteId) {
+  void _eliminarUsuario(String usuarioId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar Cliente'),
-        content: const Text('¿Estás seguro de que quieres eliminar este cliente?'),
+        title: const Text('Eliminar Usuario'),
+        content: const Text('¿Estás seguro de que quieres eliminar este usuario?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -387,14 +409,14 @@ class _ClientesScreenState extends State<ClientesScreen> {
               FirebaseFirestore.instance
                   .collection('empresas')
                   .doc(widget.empresaId)
-                  .collection('clientes')
-                  .doc(clienteId)
+                  .collection('usuarios')
+                  .doc(usuarioId)
                   .delete()
                   .then((_) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Cliente eliminado'),
+                    content: Text('Usuario eliminado'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -409,41 +431,42 @@ class _ClientesScreenState extends State<ClientesScreen> {
   }
 }
 
-class _ClienteFormDialog extends StatefulWidget {
+class _UsuarioFormDialog extends StatefulWidget {
   final String empresaId;
-  final String? clienteId;
-  final Map<String, dynamic>? clienteData;
-  final VoidCallback onClienteSaved;
+  final String? usuarioId;
+  final Map<String, dynamic>? usuarioData;
+  final VoidCallback onUsuarioSaved;
 
-  const _ClienteFormDialog({
+  const _UsuarioFormDialog({
     required this.empresaId,
-    this.clienteId,
-    this.clienteData,
-    required this.onClienteSaved,
+    this.usuarioId,
+    this.usuarioData,
+    required this.onUsuarioSaved,
   });
 
   @override
-  State<_ClienteFormDialog> createState() => _ClienteFormDialogState();
+  State<_UsuarioFormDialog> createState() => _UsuarioFormDialogState();
 }
 
-class _ClienteFormDialogState extends State<_ClienteFormDialog> {
+class _UsuarioFormDialogState extends State<_UsuarioFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _emailController = TextEditingController();
-  final _telefonoController = TextEditingController();
-  final _direccionController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _rol = 'Usuario';
   bool _activo = true;
   bool _isLoading = false;
+
+  final List<String> _roles = ['Administrador', 'Jefe de Almacén', 'Operario', 'Usuario'];
 
   @override
   void initState() {
     super.initState();
-    if (widget.clienteData != null) {
-      _nombreController.text = widget.clienteData!['nombre'] ?? '';
-      _emailController.text = widget.clienteData!['email'] ?? '';
-      _telefonoController.text = widget.clienteData!['telefono'] ?? '';
-      _direccionController.text = widget.clienteData!['direccion'] ?? '';
-      _activo = widget.clienteData!['activo'] ?? true;
+    if (widget.usuarioData != null) {
+      _nombreController.text = widget.usuarioData!['nombre'] ?? '';
+      _emailController.text = widget.usuarioData!['email'] ?? '';
+      _rol = widget.usuarioData!['rol'] ?? 'Usuario';
+      _activo = widget.usuarioData!['activo'] ?? true;
     }
   }
 
@@ -451,15 +474,14 @@ class _ClienteFormDialogState extends State<_ClienteFormDialog> {
   void dispose() {
     _nombreController.dispose();
     _emailController.dispose();
-    _telefonoController.dispose();
-    _direccionController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.clienteId != null ? 'Editar Cliente' : 'Nuevo Cliente'),
+      title: Text(widget.usuarioId != null ? 'Editar Usuario' : 'Nuevo Usuario'),
       content: SizedBox(
         width: double.maxFinite,
         child: Form(
@@ -484,33 +506,58 @@ class _ClienteFormDialogState extends State<_ClienteFormDialog> {
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Email *',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El email es requerido';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Email inválido';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _telefonoController,
-                decoration: const InputDecoration(
-                  labelText: 'Teléfono',
-                  border: OutlineInputBorder(),
+              if (widget.usuarioId == null)
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Contraseña *',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (widget.usuarioId == null && (value == null || value.trim().isEmpty)) {
+                      return 'La contraseña es requerida';
+                    }
+                    if (value != null && value.length < 6) {
+                      return 'La contraseña debe tener al menos 6 caracteres';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.phone,
-              ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _direccionController,
+              DropdownButtonFormField<String>(
+                value: _rol,
                 decoration: const InputDecoration(
-                  labelText: 'Dirección',
+                  labelText: 'Rol',
                   border: OutlineInputBorder(),
                 ),
-                maxLines: 2,
+                items: _roles.map((rol) {
+                  return DropdownMenuItem(
+                    value: rol,
+                    child: Text(rol),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _rol = value!),
               ),
               const SizedBox(height: 16),
               SwitchListTile(
                 title: const Text('Activo'),
-                subtitle: const Text('Cliente activo en el sistema'),
+                subtitle: const Text('Usuario activo en el sistema'),
                 value: _activo,
                 onChanged: (value) => setState(() => _activo = value),
               ),
@@ -524,59 +571,66 @@ class _ClienteFormDialogState extends State<_ClienteFormDialog> {
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: _isLoading ? null : _guardarCliente,
+          onPressed: _isLoading ? null : _guardarUsuario,
           child: _isLoading
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(widget.clienteId != null ? 'Actualizar' : 'Crear'),
+              : Text(widget.usuarioId != null ? 'Actualizar' : 'Crear'),
         ),
       ],
     );
   }
 
-  Future<void> _guardarCliente() async {
+  Future<void> _guardarUsuario() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final clienteData = {
+      final usuarioData = {
         'nombre': _nombreController.text.trim(),
         'email': _emailController.text.trim(),
-        'telefono': _telefonoController.text.trim(),
-        'direccion': _direccionController.text.trim(),
+        'rol': _rol,
         'activo': _activo,
-        'fechaCreacion': widget.clienteId != null 
-            ? widget.clienteData!['fechaCreacion']
+        'fechaCreacion': widget.usuarioId != null 
+            ? widget.usuarioData!['fechaCreacion']
             : Timestamp.now(),
         'fechaActualizacion': Timestamp.now(),
       };
 
-      if (widget.clienteId != null) {
+      if (widget.usuarioId != null) {
         await FirebaseFirestore.instance
             .collection('empresas')
             .doc(widget.empresaId)
-            .collection('clientes')
-            .doc(widget.clienteId)
-            .update(clienteData);
+            .collection('usuarios')
+            .doc(widget.usuarioId)
+            .update(usuarioData);
       } else {
+        // Crear usuario en Firebase Auth
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        // Guardar datos adicionales en Firestore
         await FirebaseFirestore.instance
             .collection('empresas')
             .doc(widget.empresaId)
-            .collection('clientes')
-            .add(clienteData);
+            .collection('usuarios')
+            .doc(credential.user!.uid)
+            .set(usuarioData);
       }
 
-      widget.onClienteSaved();
+      widget.onUsuarioSaved();
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.clienteId != null 
-              ? 'Cliente actualizado' 
-              : 'Cliente creado'),
+          content: Text(widget.usuarioId != null 
+              ? 'Usuario actualizado' 
+              : 'Usuario creado'),
           backgroundColor: Colors.green,
         ),
       );

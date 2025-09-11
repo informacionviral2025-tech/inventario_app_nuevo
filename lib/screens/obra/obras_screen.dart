@@ -4,7 +4,12 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 
 class ObrasScreen extends StatefulWidget {
-  const ObrasScreen({super.key});
+  final String empresaId;
+  
+  const ObrasScreen({
+    super.key,
+    required this.empresaId,
+  });
 
   @override
   State<ObrasScreen> createState() => _ObrasScreenState();

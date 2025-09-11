@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/inventory_provider.dart';
 import '../../models/articulo.dart';
+import '../etiqueta_preview.dart';
 
 class NuevoArticuloScreen extends StatefulWidget {
   final String empresaId;
@@ -65,15 +66,71 @@ class _NuevoArticuloScreenState extends State<NuevoArticuloScreen> {
       final inventoryProvider = Provider.of<InventoryProvider>(context, listen: false);
       await inventoryProvider.addArticulo(articulo);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Artículo creado exitosamente'),
-            backgroundColor: Colors.green,
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Artículo creado exitosamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Ofrecer acciones posteriores: imprimir etiqueta o escanear ahora
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Acciones rápidas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EtiquetaPreviewScreen(
+                        codigo: _codigoController.text.trim(),
+                        nombre: _nombreController.text.trim(),
+                        empresa: '',
+                      ),
+                    ),
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.print),
+                label: const Text('Imprimir etiqueta'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await Navigator.pushNamed(
+                    context,
+                    '/scanner/entrada',
+                    arguments: {
+                      'empresaId': widget.empresaId,
+                      'empresaNombre': '',
+                    },
+                  );
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Escanear ahora (entrada)'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Finalizar'),
+              ),
+            ],
           ),
-        );
-        Navigator.of(context).pop();
-      }
+        ),
+      );
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

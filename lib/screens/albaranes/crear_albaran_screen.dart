@@ -35,6 +35,7 @@ class _CrearAlbaranScreenState extends State<CrearAlbaranScreen> {
   double _iva = 21.0;
   List<Map<String, dynamic>> _articulos = [];
   bool _isLoading = false;
+  final List<Map<String, dynamic>> _csvOmitidos = [];
 
   @override
   void initState() {
@@ -180,6 +181,18 @@ class _CrearAlbaranScreenState extends State<CrearAlbaranScreen> {
               children: [
                 const Text('Artículos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: _importarDesdeCsv,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Importar CSV'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _abrirEscaner,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('Escanear'),
+                ),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: _agregarArticulo,
                   icon: const Icon(Icons.add),
@@ -301,6 +314,217 @@ class _CrearAlbaranScreenState extends State<CrearAlbaranScreen> {
     }
   }
 
+  Future<void> _abrirEscaner() async {
+    await Navigator.pushNamed(
+      context,
+      '/albaranes/recepcion-scan',
+      arguments: {
+        'empresaId': widget.empresaId,
+        'empresaNombre': widget.empresaNombre,
+        'albaranId': widget.albaran?.id,
+        'numeroAlbaran': _numeroController.text.isNotEmpty ? _numeroController.text : null,
+      },
+    );
+  }
+
+  Future<void> _importarDesdeCsv() async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pegar CSV (codigo,cantidad,precio opcional)'),
+        content: TextField(
+          controller: controller,
+          maxLines: 10,
+          decoration: const InputDecoration(
+            hintText: 'Ejemplo:\nABC123,5,2.5\nXYZ999,10',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Importar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final texto = controller.text.trim();
+    if (texto.isEmpty) return;
+
+    try {
+      final lineas = texto.split('\n');
+      final List<String> noEncontrados = [];
+      for (final linea in lineas) {
+        final cols = linea.split(',');
+        if (cols.isEmpty || cols[0].trim().isEmpty) continue;
+        final codigo = cols[0].trim();
+        final cantidad = cols.length > 1 ? double.tryParse(cols[1].trim()) ?? 0.0 : 0.0;
+        final precio = cols.length > 2 ? double.tryParse(cols[2].trim()) ?? 0.0 : 0.0;
+
+        final snap = await FirebaseFirestore.instance
+            .collection('empresas')
+            .doc(widget.empresaId)
+            .collection('articulos')
+            .where('codigo', isEqualTo: codigo)
+            .limit(1)
+            .get();
+        if (snap.docs.isEmpty) {
+          noEncontrados.add('$codigo|$cantidad|$precio');
+          continue;
+        }
+        final doc = snap.docs.first;
+        final data = doc.data();
+        setState(() {
+          _articulos.add({
+            'id': doc.id,
+            'nombre': data['nombre'] ?? codigo,
+            'codigo': codigo,
+            'cantidad': cantidad > 0 ? cantidad : 1.0,
+            'precio': precio > 0 ? precio : (data['precio'] ?? 0.0),
+          });
+        });
+      }
+
+      if (noEncontrados.isNotEmpty) {
+        await _resolverCodigosNoEncontrados(noEncontrados);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CSV importado')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error importando CSV: $e')),
+      );
+    }
+  }
+
+  Future<void> _resolverCodigosNoEncontrados(List<String> entradas) async {
+    // Cada entrada: "codigo|cantidad|precio"
+    for (final entrada in entradas) {
+      final partes = entrada.split('|');
+      final codigo = partes[0];
+      final cantidad = partes.length > 1 ? double.tryParse(partes[1]) ?? 1.0 : 1.0;
+      final precio = partes.length > 2 ? double.tryParse(partes[2]) ?? 0.0 : 0.0;
+      final item = await _resolverCodigoNoEncontrado(codigo: codigo, cantidad: cantidad, precio: precio);
+      if (item != null) {
+        setState(() {
+          _articulos.add(item);
+        });
+      } else {
+        // Registrar omisión
+        setState(() {
+          _csvOmitidos.add({
+            'codigo': codigo,
+            'cantidad': cantidad,
+            'precio': precio,
+            'motivo': 'omitido_en_import_csv',
+            'timestamp': DateTime.now().toIso8601String(),
+          });
+        });
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _resolverCodigoNoEncontrado({
+    required String codigo,
+    required double cantidad,
+    required double precio,
+  }) async {
+    return showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) {
+        final nombreCtrl = TextEditingController(text: codigo);
+        final precioCtrl = TextEditingController(text: precio > 0 ? precio.toString() : '0');
+        return AlertDialog(
+          title: Text('Código no encontrado: $codigo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Selecciona cómo resolver este código:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nombreCtrl,
+                decoration: const InputDecoration(labelText: 'Nombre (para creación rápida)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: precioCtrl,
+                decoration: const InputDecoration(labelText: 'Precio (opcional)'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Omitir'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                // Seleccionar artículo existente
+                final seleccionado = await showDialog<Map<String, dynamic>>(
+                  context: context,
+                  builder: (context) => _ArticuloSelectorDialog(empresaId: widget.empresaId),
+                );
+                if (seleccionado != null) {
+                  Navigator.pop(context, {
+                    'id': seleccionado['id'],
+                    'nombre': seleccionado['nombre'],
+                    'codigo': codigo,
+                    'cantidad': cantidad,
+                    'precio': precio > 0 ? precio : (seleccionado['precio'] ?? 0.0),
+                  });
+                }
+              },
+              icon: const Icon(Icons.search),
+              label: const Text('Seleccionar artículo'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                // Crear artículo rápido
+                final nombre = nombreCtrl.text.trim().isEmpty ? codigo : nombreCtrl.text.trim();
+                final precioNuevo = double.tryParse(precioCtrl.text.trim()) ?? 0.0;
+                try {
+                  final doc = await FirebaseFirestore.instance
+                      .collection('empresas')
+                      .doc(widget.empresaId)
+                      .collection('articulos')
+                      .add({
+                    'nombre': nombre,
+                    'codigo': codigo,
+                    'descripcion': '',
+                    'categoria': '',
+                    'precio': precioNuevo,
+                    'stock': 0,
+                    'activo': true,
+                    'fechaCreacion': FieldValue.serverTimestamp(),
+                    'fechaActualizacion': FieldValue.serverTimestamp(),
+                  });
+                  Navigator.pop(context, {
+                    'id': doc.id,
+                    'nombre': nombre,
+                    'codigo': codigo,
+                    'cantidad': cantidad,
+                    'precio': precioNuevo,
+                  });
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error creando artículo: $e')),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Crear rápido'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _guardarAlbaran() async {
     if (!_formKey.currentState!.validate()) return;
     if (_proveedorId == null) {
@@ -327,6 +551,11 @@ class _CrearAlbaranScreenState extends State<CrearAlbaranScreen> {
         subtotal: item['cantidad'] * item['precio'],
       )).toList();
 
+      final metadatos = <String, dynamic>{
+        'csvOmitidos': _csvOmitidos,
+        'csvImportados': _articulos.length,
+      };
+
       final albaran = AlbaranProveedor(
         id: widget.albaran?.id,
         numeroAlbaran: _numeroController.text,
@@ -343,12 +572,21 @@ class _CrearAlbaranScreenState extends State<CrearAlbaranScreen> {
         iva: _iva,
         total: total,
         observaciones: _observacionesController.text.trim().isEmpty ? null : _observacionesController.text.trim(),
+        metadatos: metadatos,
       );
 
       if (widget.albaran == null) {
         await _albaranService.crearAlbaran(widget.empresaId, albaran);
       } else {
-        final albaranActualizado = albaran.copyWith(id: widget.albaran!.id);
+        // Si ya hay metadatos previos, fusionar
+        final metaPrev = widget.albaran!.metadatos;
+        final albaranActualizado = albaran.copyWith(
+          id: widget.albaran!.id,
+          metadatos: {
+            ...metaPrev,
+            ...metadatos,
+          },
+        );
         await _albaranService.actualizarAlbaran(widget.empresaId, albaranActualizado);
       }
 

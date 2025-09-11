@@ -153,6 +153,16 @@ class Articulo {
     return other is Articulo && other.id == id;
   }
 
+  // Métodos de utilidad que faltaban
+  bool get necesitaReabastecimiento {
+    if (stockMinimo == null) return false;
+    return stock <= stockMinimo!;
+  }
+
+  bool get tieneStock => stock > 0;
+
+  double get valorInventario => stock * precio;
+
   @override
   int get hashCode => id.hashCode;
 }

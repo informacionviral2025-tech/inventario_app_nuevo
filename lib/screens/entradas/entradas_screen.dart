@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/articulo.dart';
-import '../../providers/inventory_provider.dart';
+import '../../providers/unified_inventory_provider.dart';
 import '../../services/entradas_service.dart';
 import '../../widgets/etiqueta_editable_widget.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -39,9 +39,9 @@ class _EntradasScreenState extends State<EntradasScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<InventoryProvider>(context, listen: false);
-      provider.initializeService(widget.empresaId);
-      provider.loadArticulos(widget.empresaId);
+      final provider = Provider.of<UnifiedInventoryProvider>(context, listen: false);
+      provider.setEmpresa(widget.empresaId, widget.empresaNombre);
+      provider.loadArticulos();
     });
   }
 
@@ -211,13 +211,13 @@ class _EntradasScreenState extends State<EntradasScreen> {
                 border: OutlineInputBorder(),
               ),
               onChanged: (value) {
-                final provider = Provider.of<InventoryProvider>(context, listen: false);
-                provider.searchArticulos(value, widget.empresaId);
+                final provider = Provider.of<UnifiedInventoryProvider>(context, listen: false);
+                provider.setSearchQuery(value);
               },
             ),
           ),
           Expanded(
-            child: Consumer<InventoryProvider>(
+            child: Consumer<UnifiedInventoryProvider>(
               builder: (context, provider, child) {
                 if (provider.isLoading) return const Center(child: CircularProgressIndicator());
                 if (provider.error != null) return Center(child: Text('Error: ${provider.error}'));
